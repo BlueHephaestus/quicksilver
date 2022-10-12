@@ -119,7 +119,9 @@ def cross_reference(df, inputs, outputs, graph_type, new_tab=False):
                     mode = "lines" if graph_type == "Line Graph" else "markers"
                     tmp = df.sort_values(by=i)
                     fig = go.Figure(data=(go.Scatter(x=tmp[i], y=tmp[o], mode=mode)))
-
+                    fig.update_layout(title="{} vs. {}".format(i,o),
+                       xaxis_title=i,
+                       yaxis_title=o)
                 if graph_type == "Table":
                     # Number of samples is the value in each cell.
                     # Checks for not too many uniques, like with pie chart

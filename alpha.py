@@ -19,7 +19,7 @@ st.markdown("<style>.stMultiSelect > label {font-size:105%; font-weight:bold} </
 default_input_file = "default.csv"
 input_file = st.file_uploader("Choose a file for Population Analysis. If no file is chosen, the default will be used.", type=["txt","csv"])
 
-@st.cache(allow_output_mutation=True)
+#@st.cache(allow_output_mutation=True) # dont enable, this is a problem for now
 def get_input_file():
     if input_file is not None:
         try:
@@ -51,12 +51,21 @@ chosen_prefixes = st.multiselect("Choose which Sample Types to use for this Anal
 @st.cache(allow_output_mutation=True)
 def filter_by_prefix(df, prefixes, chosen_prefixes):
 
-    # Selectively drop all those that aren't checked
-    # in this example about half are F half are S
-    for prefix in prefixes:
-        if prefix not in chosen_prefixes:
-            # drop all that start with that prefix
-            df.drop(df[df["EpisodeNumber"].str.startswith(prefix)].index, inplace=True)
+    # Keep only the ones with the prefixes selected
+    # can't do a negative mask because there are prefixes not in our list.
+    #
+    # Get samples with correct prefix
+    masks = [df["EpisodeNumber"].str.startswith(prefix) for prefix in chosen_prefixes]
+    # Combine all of them with logical OR into one
+    mask = masks[0]
+    if len(masks) > 1:
+        for m in masks[1:]:
+            mask = mask | m
+    df = df[mask]
+
+    #for prefix in prefixes:
+        #if prefix not in chosen_prefixes:
+            #df.drop(df[df["EpisodeNumber"].str.startswith(prefix)].index, inplace=True)
     return df
 
 # df now updated
