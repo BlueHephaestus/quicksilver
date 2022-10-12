@@ -20,7 +20,7 @@ def is_valid_inputs(inputs, outputs, graph_type):
         return n_i + n_o >= 1
 
 
-def cross_reference(df, inputs, outputs, graph_type):
+def cross_reference(df, inputs, outputs, graph_type, new_tab=False):
     # For each cross_reference on the dataframe, the user will provide:
     #   1. Inputs / Independent Variables
     #   2. Outputs / Dependent Variables
@@ -94,29 +94,31 @@ def cross_reference(df, inputs, outputs, graph_type):
         # Generate a fig for each
         # TODO make cutoff number to just include the rest in "Other" for piechart?
         for i in inputs:
+            container = st.container()
             if graph_type == "Pie Chart":
                 names,values = np.unique(df[i], return_counts=True)
                 if len(names) <= 100:
                     fig = px.pie(df, values=values, names=names, title=i)
-                    st.plotly_chart(fig, use_container_width=True)
                 else:
                     st.write("Unable to create graph for {}, too many unique values.".format(i))
 
             elif graph_type == "Histogram of Bins":
-                container = st.container()
-                fig = px.histogram(df, x=i, title=i, nbins=st.slider("Number of Bins", key=i))
+                fig = px.histogram(df, x=i, title=i, nbins=st.slider("Number of Bins", key=str(new_tab)+i))
+
+            if new_tab:
+                fig.show()
+            else:
                 container.plotly_chart(fig, use_container_width=True)
 
     elif graph_type in GRAPHS_2D:
         for i in inputs: # 1 fig per input, x is always sample index
             for o in outputs: # 1 fig per input, x is always sample index
                 # TODO add 3rd variable option here???
+                container = st.container()
                 if graph_type == "Line Graph" or graph_type == "Scatter Plot":
                     mode = "lines" if graph_type == "Line Graph" else "markers"
-                    container = st.container()
                     tmp = df.sort_values(by=i)
                     fig = go.Figure(data=(go.Scatter(x=tmp[i], y=tmp[o], mode=mode)))
-                    container.plotly_chart(fig, use_container_width=True)
 
                 if graph_type == "Table":
                     # Number of samples is the value in each cell.
@@ -148,21 +150,21 @@ def cross_reference(df, inputs, outputs, graph_type):
                     # Plotly does this the reverse way so we transpose to match them
                     # REMEMBER TO DO THIS LAST
                     values = np.transpose(values)
-                    container = st.container()
                     fig = go.Figure(data=[go.Table(
                         header = dict(values=col_headers),
                         cells=dict(values=values),
                         )])
                     fig.update_layout(title_text="{} vs. {}".format(i,o))
-                    container.plotly_chart(fig, use_container_width=True)
 
                 if graph_type == "2D Heatmap of Bins":
                     # last one!!!111!!
                     # This is basically whwat the table should have been... maybe we redo later.
-                    container = st.container()
-                    fig = px.density_heatmap(df, x=i, y=o, nbinsx=st.slider("Number of X Bins", key=i+"_"+o+"_x"), nbinsy=st.slider("Number of Y Bins",key=i+"_"+o+"_y"), marginal_x="histogram",marginal_y="histogram")
-                    container.plotly_chart(fig, use_container_width=True)
+                    fig = px.density_heatmap(df, x=i, y=o, nbinsx=st.slider("Number of X Bins", key=str(new_tab)+i+"_"+o+"_x"), nbinsy=st.slider("Number of Y Bins",key=str(new_tab)+i+"_"+o+"_y"), marginal_x="histogram",marginal_y="histogram")
 
+                if new_tab:
+                    fig.show()
+                else:
+                    container.plotly_chart(fig, use_container_width=True)
 
         
 

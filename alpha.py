@@ -107,31 +107,25 @@ Choose your input and output variables, as well as type of graph, to perform a c
 # So instead we let them pick their parameters, and generate new ones with the Generate button.
 
 # NOTE TEMPORARY DEFAULTS TO SPEED DEBUGGING
-inputs = st.multiselect("Input / Independent Variables: ", chosen_headers, ["Sex"])
-outputs = st.multiselect("Output / Dependent Variables: ", [oh for oh in chosen_headers if oh not in inputs], ["FeedType"])
-graph_type = st.radio("Graph Type: ", ["Line Graph", "Scatter Plot", "Pie Chart", "Table", "Histogram of Bins", "2D Heatmap of Bins"], 5)
+inputs = st.multiselect("Input / Independent Variables: ", chosen_headers)
+outputs = st.multiselect("Output / Dependent Variables: ", [oh for oh in chosen_headers if oh not in inputs])
+graph_type = st.radio("Graph Type: ", ["Line Graph", "Scatter Plot", "Pie Chart", "Table", "Histogram of Bins", "2D Heatmap of Bins"], 1)
 
 is_valid = is_valid_inputs(inputs, outputs, graph_type)
-st.button("Generate", on_click=cross_reference, args=(df, inputs, outputs, graph_type), disabled=not is_valid)
-cross_reference(df, inputs, outputs, graph_type)
+
+# TODO doesn't work with customising sliders, won't copy slider settings at the moment.
+# can't work with customisable, but it should copy the settings.
+st.button("Generate in New Tab", on_click=cross_reference, args=(df, inputs, outputs, graph_type), kwargs=({"new_tab":True}), disabled=not is_valid)
+cross_reference(df, inputs, outputs, graph_type, new_tab=False)
 
 
-
-# alright so the plotly thing makes a new page
-# but we need this to actually be in a new page.
-# how do
-# we don't
-# we have it set up beforehand, then generate on init
-
-
-
-
-
-
-
-
-
-
+# TODO improve caching and performance
+# TODO improve "unique element" threshold for pie charts, so that it will make an "other" category automatically
+# TODO change table to be a modified sort of 2d heatmap
+# TODO make bin changing more intuitive
+# TODO add color coding and other multiple-line graphs
+#
+# TODO add TRANSFORMATIONS to the data before cross reference.
 
 
 
