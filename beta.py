@@ -367,6 +367,22 @@ _1, _2 = st.columns(2)
 
 gcol1, gcol2 = st.columns((1,3), gap="large")
 
+# BRYCE
+
+# UNCOMMENT, THEN COMMENT AGAIN
+# st.session_state["x_mean"] =0.5000226408259373
+# st.session_state["x_std"] = 0.28860266741209906
+# st.session_state["x_lo"] = 0.99
+# st.session_state["x_hi"] = 1.288602667412099
+# st.session_state["x_min"] = 0.01752399927549357
+# st.session_state["x_max"] = 1
+# st.session_state["y_mean"] = 0.5000226408259373
+# st.session_state["y_std"] = 0.2885398810978457
+# st.session_state["y_hi"] = 1.0771024030216285
+# st.session_state["y_min"] = 0.005977178047455171
+# st.session_state["y_max"] = 1
+# st.session_state["y_lo"] = -0.07705712136975407
+
 #st.session_state["x_mean"] = 0.0
 #st.session_state["x_std"] = 0.0
 #st.session_state["x_lo"] = 0.0
@@ -587,7 +603,7 @@ with gcol2:
     fig.layout.margin=dict(l=200, r=600, t=0, b=0)
     graph_container.plotly_chart(fig, use_container_width=True)
 
-
+st.session_state
 
 # """#### This file will be used for input to the upcoming analysis.
 # If you wish to change it, do so above.
