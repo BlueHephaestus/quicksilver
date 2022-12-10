@@ -96,7 +96,7 @@ data_master, data_fname = read_input_file()
 data = data_master.copy()
 
 #print(list(st.session_state.keys()))
-if len(st.session_state.keys()) < 4:
+if len(st.session_state.keys()) < 1:
 #if "data" not in st.session_state:
     print("Resetting session")
     st.session_state = {
@@ -104,7 +104,41 @@ if len(st.session_state.keys()) < 4:
         "row_filter_opts": [],
         "col_filter_opts": [],
         "update": False,
+        "x_mean": 0.0,
+        "x_std": 1.0,
+        "x_lo": -1.0,
+        "x_hi": 1.0,
+        "x_min": -4.0,
+        "x_max": 4.0,
+        "y_mean": 0.0,
+        "y_std": 1.0,
+        "y_lo": -1.0,
+        "y_hi": 1.0,
+        "y_min": -4.0,
+        "y_max": 4.0,
     }
+# Lambdas for reference of mean and std of values to then use for graphing ranges
+x_mean = lambda: st.session_state["x_mean"]
+y_mean = lambda: st.session_state["y_mean"]
+x_std = lambda: st.session_state["x_std"]
+y_std = lambda: st.session_state["y_std"]
+
+# Lambdas for getting the values for the i'th interval from the mean, e.g. 2 => 2 stds below and above the mean.
+x_interval = lambda i: [float(x_mean()-i*x_std()), float(x_mean()+i*x_std())]
+y_interval = lambda i: [float(y_mean()-i*y_std()), float(y_mean()+i*y_std())]
+
+# Lambdas for reference of min max values - we additionally add 1 std to each to give them buffer area
+x_min = lambda: st.session_state["x_min"]-x_std()
+y_min = lambda: st.session_state["y_min"]-y_std()
+x_max = lambda: st.session_state["x_max"]+x_std()
+y_max = lambda: st.session_state["y_max"]+y_std()
+
+
+# Lambdas for threshold values reference
+x_lo = lambda: st.session_state["x_lo"]
+x_hi = lambda: st.session_state["x_hi"]
+y_lo = lambda: st.session_state["y_lo"]
+y_hi = lambda: st.session_state["y_hi"]
 
 sess = lambda s: st.session_state[s]
 f"#### Current Data: "
@@ -336,10 +370,8 @@ with col2:
         "Data Transformations (Make sure your data is in the correct ranges for your chosen transform)",
         ("None (default)",
          "Log Scaling (base 10)",
-         "Square Root",
          "Yeo-Johnson",
          "Box-Cox (Only applied to columns with all positive values, otherwise columns will be skipped)",
-         "Inverse Fourier",
          ))
 
     # TODO: Add reset button?
@@ -370,18 +402,6 @@ gcol1, gcol2 = st.columns((1,3), gap="large")
 # BRYCE
 
 # UNCOMMENT, THEN COMMENT AGAIN
-# st.session_state["x_mean"] =0.5000226408259373
-# st.session_state["x_std"] = 0.28860266741209906
-# st.session_state["x_lo"] = 0.99
-# st.session_state["x_hi"] = 1.288602667412099
-# st.session_state["x_min"] = 0.01752399927549357
-# st.session_state["x_max"] = 1
-# st.session_state["y_mean"] = 0.5000226408259373
-# st.session_state["y_std"] = 0.2885398810978457
-# st.session_state["y_hi"] = 1.0771024030216285
-# st.session_state["y_min"] = 0.005977178047455171
-# st.session_state["y_max"] = 1
-# st.session_state["y_lo"] = -0.07705712136975407
 
 #st.session_state["x_mean"] = 0.0
 #st.session_state["x_std"] = 0.0
@@ -402,76 +422,8 @@ gcol1, gcol2 = st.columns((1,3), gap="large")
 #st.session_state["x_mean"] = 0.0
 #st.session_state["x_mean"] = 0.0
 
-# Lambdas for reference of mean and std of values to then use for graphing ranges
-x_mean = lambda: st.session_state["x_mean"]
-y_mean = lambda: st.session_state["y_mean"]
-x_std = lambda: st.session_state["x_std"]
-y_std = lambda: st.session_state["y_std"]
-
-#x_mean = lambda: float(0)
-#y_mean = lambda: float(0)
-#x_std = lambda: float(1)
-#y_std = lambda: float(1)
-#x_min = lambda: float(-3)
-#x_max = lambda: float(3)
-#y_min = lambda: float(-3)
-#y_max = lambda: float(3)
-#x
-# Lambdas for getting the values for the i'th interval from the mean, e.g. 2 => 2 stds below and above the mean.
-x_interval = lambda i: [float(x_mean()-i*x_std()), float(x_mean()+i*x_std())]
-y_interval = lambda i: [float(y_mean()-i*y_std()), float(y_mean()+i*y_std())]
-
-# Lambdas for reference of min max values - we additionally add 1 std to each to give them buffer area
-#x_min = x_mean()-x_std()
-#y_min = x_mean()-y_std()
-#x_max = x_mean()+x_std()
-#y_max = x_mean()+y_std()
-x_min = lambda: st.session_state["x_min"]-x_std()
-y_min = lambda: st.session_state["y_min"]-y_std()
-x_max = lambda: st.session_state["x_max"]+x_std()
-y_max = lambda: st.session_state["y_max"]+y_std()
 
 
-# Lambdas for threshold values reference
-x_lo = lambda: st.session_state["x_lo"]
-x_hi = lambda: st.session_state["x_hi"]
-y_lo = lambda: st.session_state["y_lo"]
-y_hi = lambda: st.session_state["y_hi"]
-
-with gcol1:
-    # Settings for x threshold
-    st.session_state["x_lo"], st.session_state["x_hi"] = st.slider(
-        'X threshold',
-        x_min(), x_max(), x_interval(2), 0.01, format="%0.4f")
-
-    # Can also be controlled with more granularity
-    st.session_state["x_lo"] = st.number_input(
-        'X Lower Threshold',
-        x_min(), x_hi(), x_lo(), 0.0001, format="%0.4f")
-    st.session_state["x_hi"] = st.number_input(
-        'X Higher Threshold',
-        x_lo(), x_max(), x_hi(), 0.0001, format="%0.4f")
-
-    # Spacer
-    st.markdown("#")
-    st.markdown("#")
-    st.markdown("#")
-    st.markdown("#")
-
-    # Settings for y threshold
-    st.session_state["y_lo"], st.session_state["y_hi"] = st.slider(
-        'Y threshold',
-        y_min(), y_max(), y_interval(2), 0.01, format="%0.4f")
-
-    st.session_state["y_lo"] = st.number_input(
-        'Y Lower Threshold',
-        y_min(), y_hi(), y_lo(), 0.0001, format="%0.4f")
-    st.session_state["y_hi"] = st.number_input(
-        'Y Higher Threshold',
-        y_lo(), y_max(), y_hi(), 0.0001, format="%0.4f")
-
-    # on change, change the lines.
-    #st.write('Values:', values) # and then we can add on the % etc.
 
 #@st.cache(allow_output_mutation=True)
 def get_fig(x, y):
@@ -590,18 +542,64 @@ with _1:
 with _2:
     st.markdown("#")
     #st.button("GENERATE GRAPH", on_click=generate_graph, args=(inputs[0], outputs[0]))
+
 #def generate_graph(x_label,y_label):
-x = data[inputs[0]]
-y = data[outputs[0]]
-with gcol2:
-    graph_container = st.container()
-    fig = get_fig(x,y)
-    #fig.update_layout(autosize=False, height=800)
-    # Set up some reasonable margins and heights so we actually get a more square-like graph
-    # rather than the wide boi streamlit wants it to be
-    fig.layout.height=1000
-    fig.layout.margin=dict(l=200, r=600, t=0, b=0)
-    graph_container.plotly_chart(fig, use_container_width=True)
+#x = data[inputs[0]]
+#y = data[outputs[0]]
+
+# If the user hasn't specified values for this, then don't show anything yet.
+if len(inputs) == 0 or len(outputs) == 0:
+    # Not enough values, specify text for this.
+    st.markdown("### Not enough values specified; select an input and and output variable to generate a graph.")
+
+else:
+
+    with gcol1:
+        # Settings for x threshold
+        st.session_state["x_lo"], st.session_state["x_hi"] = st.slider(
+            'X threshold',
+            x_min(), x_max(), x_interval(2), 0.01, format="%0.4f")
+
+        # Can also be controlled with more granularity
+        st.session_state["x_lo"] = st.number_input(
+            'X Lower Threshold',
+            x_min(), x_hi(), x_lo(), 0.0001, format="%0.4f")
+        st.session_state["x_hi"] = st.number_input(
+            'X Higher Threshold',
+            x_lo(), x_max(), x_hi(), 0.0001, format="%0.4f")
+
+        # Spacer
+        st.markdown("#")
+        st.markdown("#")
+        st.markdown("#")
+        st.markdown("#")
+
+        # Settings for y threshold
+        st.session_state["y_lo"], st.session_state["y_hi"] = st.slider(
+            'Y threshold',
+            y_min(), y_max(), y_interval(2), 0.01, format="%0.4f")
+
+        st.session_state["y_lo"] = st.number_input(
+            'Y Lower Threshold',
+            y_min(), y_hi(), y_lo(), 0.0001, format="%0.4f")
+        st.session_state["y_hi"] = st.number_input(
+            'Y Higher Threshold',
+            y_lo(), y_max(), y_hi(), 0.0001, format="%0.4f")
+
+        # on change, change the lines.
+        #st.write('Values:', values) # and then we can add on the % etc.
+
+    with gcol2:
+        graph_container = st.container()
+        x = data[inputs[0]]
+        y = data[outputs[0]]
+        fig = get_fig(x, y)
+        #fig.update_layout(autosize=False, height=800)
+        # Set up some reasonable margins and heights so we actually get a more square-like graph
+        # rather than the wide boi streamlit wants it to be
+        fig.layout.height=1000
+        fig.layout.margin=dict(l=100, r=100, t=0, b=0)
+        graph_container.plotly_chart(fig, use_container_width=True)
 
 st.session_state
 
