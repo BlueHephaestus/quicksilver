@@ -15,6 +15,7 @@ though i did just test it and it isn't loading at all so long as we have the st.
 import streamlit as st
 import numpy as np
 import pandas as pd
+from Session import *
 from scipy import stats
 from cross_referencing import *
 from sklearn.preprocessing import power_transform
@@ -67,8 +68,6 @@ st.markdown("""<style>div.stButton > button:first-child {
             }
             """, unsafe_allow_html=True)
 
-
-
 "# Data Preparation"
 default_input_file = "default.csv"
 input_file = st.file_uploader("Choose a file for Population Analysis. If no file is chosen, the default will be used.", type=["txt","csv"])
@@ -95,8 +94,7 @@ def read_input_file():
 data_master, data_fname = read_input_file()
 data = data_master.copy()
 
-#print(list(st.session_state.keys()))
-if len(st.session_state.keys()) < 1:
+if len(st.session_state.keys()) < 4:
 #if "data" not in st.session_state:
     print("Resetting session")
     st.session_state = {
@@ -104,48 +102,12 @@ if len(st.session_state.keys()) < 1:
         "row_filter_opts": [],
         "col_filter_opts": [],
         "update": False,
-        "x_mean": 0.0,
-        "x_std": 1.0,
-        "x_lo": -1.0,
-        "x_hi": 1.0,
-        "x_min": -4.0,
-        "x_max": 4.0,
-        "y_mean": 0.0,
-        "y_std": 1.0,
-        "y_lo": -1.0,
-        "y_hi": 1.0,
-        "y_min": -4.0,
-        "y_max": 4.0,
     }
-# Lambdas for reference of mean and std of values to then use for graphing ranges
-x_mean = lambda: st.session_state["x_mean"]
-y_mean = lambda: st.session_state["y_mean"]
-x_std = lambda: st.session_state["x_std"]
-y_std = lambda: st.session_state["y_std"]
-
-# Lambdas for getting the values for the i'th interval from the mean, e.g. 2 => 2 stds below and above the mean.
-x_interval = lambda i: [float(x_mean()-i*x_std()), float(x_mean()+i*x_std())]
-y_interval = lambda i: [float(y_mean()-i*y_std()), float(y_mean()+i*y_std())]
-
-# Lambdas for reference of min max values - we additionally add 1 std to each to give them buffer area
-x_min = lambda: st.session_state["x_min"]-x_std()
-y_min = lambda: st.session_state["y_min"]-y_std()
-x_max = lambda: st.session_state["x_max"]+x_std()
-y_max = lambda: st.session_state["y_max"]+y_std()
-
-
-# Lambdas for threshold values reference
-x_lo = lambda: st.session_state["x_lo"]
-x_hi = lambda: st.session_state["x_hi"]
-y_lo = lambda: st.session_state["y_lo"]
-y_hi = lambda: st.session_state["y_hi"]
 
 sess = lambda s: st.session_state[s]
 f"#### Current Data: "
 data_container = st.empty()
-#if not sess("update"):
 data_container.container().write(st.session_state["data"])
-#st.session_state["data"]
 
 ##### DATA PREPARATION AND MODIFICATION TIME #####
 
@@ -274,10 +236,6 @@ def update_data():
             for col in data:
                 data[col] = np.log10(data[col])
 
-        case "Square Root":
-            for col in data:
-                data[col] = np.sqrt(data[col])
-
         case "Yeo-Johnson":
             for col in data:
                 data[col] = power_transform(data[col].values.reshape(-1,1), method="yeo-johnson")
@@ -290,11 +248,6 @@ def update_data():
                         # Add epsilon to let power transform happen and avoid error
                         data[col] += 1e-8
                     data[col] = power_transform(data[col].values.reshape(-1,1), method="box-cox")
-
-        case "Inverse Fourier":
-            # Have to cast this to float64 in order to get rid of complex part of the imaginary num.
-            for col in data:
-                data[col] = np.fft.ifft(data[col].values).astype(np.float64)
 
 
     # PUT BACK NON NUMERICAL COLUMNS
@@ -383,8 +336,7 @@ with col2:
 "Lets just start with one var each."
 
 data = st.session_state["data"]
-
-
+session = Session(data)
 #x = data["C24:0"]
 #y = data["C26:0"]
 @st.cache
@@ -397,43 +349,19 @@ def get_y():
 
 _1, _2 = st.columns(2)
 
-gcol1, gcol2 = st.columns((1,3), gap="large")
-
-# BRYCE
-
-# UNCOMMENT, THEN COMMENT AGAIN
-
-#st.session_state["x_mean"] = 0.0
-#st.session_state["x_std"] = 0.0
-#st.session_state["x_lo"] = 0.0
-#st.session_state["x_hi"] = 0.0
-#st.session_state["x_min"] = 0.0
-#st.session_state["x_max"] = 0.0
-
-#st.session_state["y_mean"] = 0.0
-#st.session_state["y_std"] = 0.0
-##st.session_state["y_lo"] = 0.0
-#st.session_state["y_hi"] = 0.0
-#st.session_state["y_min"] = 0.0
-#st.session_state["y_max"] = 0.0
-#st.session_state["y_mean"] = 0.0
-#st.session_state["y_mean"] = 0.0
-#st.session_state["x_mean"] = 0.0
-#st.session_state["x_mean"] = 0.0
-#st.session_state["x_mean"] = 0.0
-
+gcol1, gcol2, gcol3 = st.columns((1,2,1), gap="large")
 
 
 
 #@st.cache(allow_output_mutation=True)
-def get_fig(x, y):
+def get_threshold_graph():
     #x = get_x()
     #y = get_y()
     fig = go.Figure(
         data=[
             go.Histogram2d(
-                x=x,
-                y=y,
+                x=session.x.data,
+                y=session.y.data,
                 nbinsx=400,
                 nbinsy=400,
                 colorscale="Blues",
@@ -450,56 +378,53 @@ def get_fig(x, y):
     fig.update_xaxes(showgrid=False, tickfont=dict(size=fontsize))
     fig.update_yaxes(showgrid=False, tickfont=dict(size=fontsize))
 
-    # Init these
-    st.session_state["x_min"] = np.amin(x)
-    st.session_state["y_min"] = np.amin(y)
-    st.session_state["x_max"] = np.amax(x)
-    st.session_state["y_max"] = np.amax(y)
-
-    st.session_state["x_mean"] = np.mean(x)
-    st.session_state["x_std"] = np.std(x)
-    st.session_state["y_mean"] = np.mean(y)
-    st.session_state["y_std"] = np.std(y)
-
-    #print(x_min(),x_max())
+    #print(session.x.min,session.x.max)
     #st.session_state["x_thresh"] = x_interval(2)
     #st.session_state["y_thresh"] = y_interval(2)
 
     # Threshold lines - we use these to draw the main quadrant thresholds
-    fig.add_vline(x=x_lo(), annotation_text=f"{round(x_lo(),4)}", annotation_font=dict(size=fontsize), annotation_xshift=-shift, annotation_position="left")
-    fig.add_vline(x=x_hi(), annotation_text=f"{round(x_hi(),4)}", annotation_font=dict(size=fontsize), annotation_xshift=shift, annotation_position="right")
-    fig.add_hline(y=y_lo(), annotation_text=f"{round(y_lo(),4)}", annotation_font=dict(size=fontsize), annotation_yshift=-shift, annotation_position="bottom")
-    fig.add_hline(y=y_hi(), annotation_text=f"{round(y_hi(),4)}", annotation_font=dict(size=fontsize), annotation_yshift=shift, annotation_position="top")
+    fig.add_vline(x=session.x.lo, annotation_text=f"{round(session.x.lo,4)}", annotation_font=dict(size=fontsize), annotation_xshift=-shift, annotation_position="left")
+    fig.add_vline(x=session.x.hi, annotation_text=f"{round(session.x.hi,4)}", annotation_font=dict(size=fontsize), annotation_xshift=shift, annotation_position="right")
+    fig.add_hline(y=session.y.lo, annotation_text=f"{round(session.y.lo,4)}", annotation_font=dict(size=fontsize), annotation_yshift=-shift, annotation_position="bottom")
+    fig.add_hline(y=session.y.hi, annotation_text=f"{round(session.y.hi,4)}", annotation_font=dict(size=fontsize), annotation_yshift=shift, annotation_position="top")
 
     # Threshold areas (rectangles)
-    fig.add_vrect(x0=x_min(), x1=x_lo(), fillcolor="blue", opacity=.2)
-    fig.add_vrect(x0=x_hi(), x1=x_max(), fillcolor="blue", opacity=.2)
-    fig.add_hrect(y0=y_min(), y1=y_lo(), fillcolor="red", opacity=.2)
-    fig.add_hrect(y0=y_hi(), y1=y_max(), fillcolor="red", opacity=.2)
+    # for some reason need an extra buffer for the minimum x one.
+    fig.add_vrect(x0=session.x.min-session.x.std, x1=session.x.lo, fillcolor="blue", opacity=.2)
+    fig.add_vrect(x0=session.x.hi, x1=session.x.max, fillcolor="blue", opacity=.2)
+    fig.add_hrect(y0=session.y.min, y1=session.y.lo, fillcolor="red", opacity=.2)
+    fig.add_hrect(y0=session.y.hi, y1=session.y.max, fillcolor="red", opacity=.2)
+
+
+    return fig
+
+def get_threshold_tables():
+    # Get 3x3 tables for the areas in each of our sections in our threshold graph.
+
 
     # Compute center of all octants so we can put annotations directly in the middle of them.
-    # Several of these are simplified to avoid repeated calls to y_hi() x_lo() and so on.
-    # e.g. (y_max-y_hi())/4 + y_hi() => y_max/4 - y_hi()/4 + y_hi() => y_max/4 + 3*y_hi()/4
-    # e.g. (x_max - x_hi())/2 + x_hi() => x_max/2 - x_hi()/2 + x_hi() => x_max/2 + x_hi()/2
-    left = x_lo()/2 + x_min()/2
-    top = y_max()/4 + 3*y_hi()/4 # smaller because of height of text, hence /4
-    right = x_max()/2 + x_hi()/2
-    bot = y_lo()/4 + 3*y_min()/4
-    mid_x = x_hi()/2 + x_lo()/2
-    mid_y = y_hi()/2 + y_lo()/2
+    # Several of these are simplified to avoid repeated calls to session.y.hi session.x.lo and so on.
+    # e.g. (y_max-session.y.hi)/4 + session.y.hi => y_max/4 - session.y.hi/4 + session.y.hi => y_max/4 + 3*session.y.hi/4
+    # e.g. (x_max - session.x.hi)/2 + session.x.hi => x_max/2 - session.x.hi/2 + session.x.hi => x_max/2 + session.x.hi/2
+    left = session.x.lo/2 + session.x.min/2
+    top = session.y.max/4 + 3*session.y.hi/4 # smaller because of height of text, hence /4
+    right = session.x.max/2 + session.x.hi/2
+    bot = session.y.lo/4 + 3*session.y.min/4
+    mid_x = session.x.hi/2 + session.x.lo/2
+    mid_y = session.y.hi/2 + session.y.lo/2
 
     # Compute values for all octants for the text to go in each - # of values inside and % of values inside.
     # We create masks for each to avoid having to repeat our calculations for the corners, where we AND them together.
-    mask_x_hi = x > x_hi()
-    mask_x_lo = x < x_lo()
-    mask_y_hi = y > y_hi()
-    mask_y_lo = y < y_lo()
+    mask_x_hi = session.x.data > session.x.hi
+    mask_x_lo = session.x.data < session.x.lo
+    mask_y_hi = session.y.data > session.y.hi
+    mask_y_lo = session.y.data < session.y.lo
 
     # Middle one is actually the most complicated in terms of logic
-    mask_mid = np.logical_and(np.logical_and(x >= x_lo(), x <= x_hi()), np.logical_and(y >= y_lo(), y <= y_hi()))
+    mask_mid = np.logical_and(np.logical_and(session.x.data >= session.x.lo, session.x.data <= session.x.hi), np.logical_and(session.y.data >= session.y.lo, session.y.data <= session.y.hi))
 
     # len
-    n = len(x) # EXPECTS X AND Y TO BE SAME LENGTH
+    n = len(session.x.data) # EXPECTS X AND Y TO BE SAME LENGTH
 
     mask_n = lambda m: np.sum(m) # compute # in masked area
     mask_and_n = lambda m1, m2: np.sum(np.logical_and(m1,m2)) # compute # in intersecting masked area
@@ -512,29 +437,72 @@ def get_fig(x, y):
     mask_and_stats = lambda m1,m2: (mask_and_n(m1,m2), mask_and_p(m1,m2))
 
     # Given this, now we can assemble the 9 values
-    grid = [
-        [mask_and_stats(mask_x_lo, mask_y_hi), mask_stats(mask_y_hi), mask_and_stats(mask_x_hi, mask_y_hi)],
-        [mask_stats(mask_x_lo), mask_stats(mask_mid), mask_stats(mask_x_hi)],
-        [mask_and_stats(mask_x_lo, mask_y_lo), mask_stats(mask_y_lo), mask_and_stats(mask_x_hi, mask_y_lo)],
+    grid_ns = [
+        [mask_and_n(mask_x_lo, mask_y_hi), mask_n(mask_y_hi), mask_and_n(mask_x_hi, mask_y_hi)],
+        [mask_n(mask_x_lo), mask_n(mask_mid), mask_n(mask_x_hi)],
+        [mask_and_n(mask_x_lo, mask_y_lo), mask_n(mask_y_lo), mask_and_n(mask_x_hi, mask_y_lo)],
+    ]
+    grid_ps = [
+        [mask_and_p(mask_x_lo, mask_y_hi), mask_p(mask_y_hi), mask_and_p(mask_x_hi, mask_y_hi)],
+        [mask_p(mask_x_lo), mask_p(mask_mid), mask_p(mask_x_hi)],
+        [mask_and_p(mask_x_lo, mask_y_lo), mask_p(mask_y_lo), mask_and_p(mask_x_hi, mask_y_lo)],
     ]
 
-    # Format string lambda
-    grid_str = lambda i,j: f"{grid[i][j][0]}, {grid[i][j][1]}%"
+    for i in range(3):
+        for j in range(3):
+            grid_ns[i][j] = " <br>" + str(grid_ns[i][j])
+            grid_ps[i][j] = " <br>" + str(grid_ps[i][j])
 
-    # Finally put all the values in
-    fig.add_annotation(x=left, y=top, text=grid_str(0,0), font=dict(size=fontsize))
-    fig.add_annotation(x=mid_x, y=top, text=grid_str(0,1), font=dict(size=fontsize))
-    fig.add_annotation(x=right, y=top, text=grid_str(0,2), font=dict(size=fontsize))
+    # # Format string lambda
+    # grid_str = lambda i,j: f"{grid[i][j][0]}, {grid[i][j][1]}%"
+    #
+    # # Finally put all the values in
+    # fig.add_annotation(x=left, y=top, text=grid_str(0,0), font=dict(size=fontsize))
+    # fig.add_annotation(x=mid_x, y=top, text=grid_str(0,1), font=dict(size=fontsize))
+    # fig.add_annotation(x=right, y=top, text=grid_str(0,2), font=dict(size=fontsize))
+    #
+    # fig.add_annotation(x=left, y=mid_y, text=grid_str(1,0), font=dict(size=fontsize))
+    # fig.add_annotation(x=mid_x, y=mid_y, text=grid_str(1,1), font=dict(size=fontsize))
+    # fig.add_annotation(x=right, y=mid_y, text=grid_str(1,2), font=dict(size=fontsize))
+    #
+    # fig.add_annotation(x=left, y=bot, text=grid_str(2,0), font=dict(size=fontsize))
+    # fig.add_annotation(x=mid_x, y=bot, text=grid_str(2,1), font=dict(size=fontsize))
+    # fig.add_annotation(x=right, y=bot, text=grid_str(2,2), font=dict(size=fontsize))
+    # fig = go.Figure(data=[go.Table(
+    #     header=dict(values=[1,2,3]),
+    #     cells=dict(values=np.random.randn(9).reshape((3,3)), height=40),
+    # )])
+    red = "#f9c9cc"
+    blue = "#c6c9ff"
+    purple = "#d1a1cc"
+    # transposed because plotly transposes the table
+    colors = [
+        [purple, blue, purple],
+        [red, "white", red],
+        [purple, blue, purple]
+    ]
 
-    fig.add_annotation(x=left, y=mid_y, text=grid_str(1,0), font=dict(size=fontsize))
-    fig.add_annotation(x=mid_x, y=mid_y, text=grid_str(1,1), font=dict(size=fontsize))
-    fig.add_annotation(x=right, y=mid_y, text=grid_str(1,2), font=dict(size=fontsize))
+    # Plotly does this the reverse way so we transpose to match them
+    # REMEMBER TO DO THIS LAST
+    grid_ns = np.transpose(grid_ns)
+    grid_ps = np.transpose(grid_ps)
+    fig_ns = go.Figure(data=[go.Table(
+        header=None,
+        cells=dict(values=grid_ns, height=130),
+    )])
+    fig_ps = go.Figure(data=[go.Table(
+        header=None,
+        cells=dict(values=grid_ps, height=130, suffix="%"),
+    )])
+    # Remove headers via making invisible
+    fig_ns.for_each_trace(lambda t: t.update(header_fill_color='rgba(0,0,0,0)'))
+    fig_ps.for_each_trace(lambda t: t.update(header_fill_color='rgba(0,0,0,0)'))
+    fig_ns.update_traces(cells_fill_color=colors)
+    fig_ps.update_traces(cells_fill_color=colors)
 
-    fig.add_annotation(x=left, y=bot, text=grid_str(2,0), font=dict(size=fontsize))
-    fig.add_annotation(x=mid_x, y=bot, text=grid_str(2,1), font=dict(size=fontsize))
-    fig.add_annotation(x=right, y=bot, text=grid_str(2,2), font=dict(size=fontsize))
-
-    return fig
+    fig_ns.update_layout(font_size=32, margin=dict(t=10, b=10))
+    fig_ps.update_layout(font_size=32, margin=dict(t=10, b=10))
+    return fig_ns, fig_ps
 
 with _1:
     inputs = st.multiselect("Input / Independent Variables: ", data.columns)
@@ -554,19 +522,27 @@ if len(inputs) == 0 or len(outputs) == 0:
 
 else:
 
+    # Update these attributes when we have columns for them
+    session.x.col = inputs[0]
+    session.y.col = outputs[0]
+    session.x.update(session.data)
+    session.y.update(session.data)
+    session.x.print()
+
     with gcol1:
         # Settings for x threshold
-        st.session_state["x_lo"], st.session_state["x_hi"] = st.slider(
+        session.x.lo, session.x.hi = st.slider(
             'X threshold',
-            x_min(), x_max(), x_interval(2), 0.01, format="%0.4f")
+            session.x.min, session.x.max, session.x.interval(1), 0.01, format="%0.4f")
+        session.x.print()
 
         # Can also be controlled with more granularity
-        st.session_state["x_lo"] = st.number_input(
+        session.x.lo = st.number_input(
             'X Lower Threshold',
-            x_min(), x_hi(), x_lo(), 0.0001, format="%0.4f")
-        st.session_state["x_hi"] = st.number_input(
+            session.x.min, session.x.hi, session.x.lo, 0.0001, format="%0.4f")
+        session.x.hi = st.number_input(
             'X Higher Threshold',
-            x_lo(), x_max(), x_hi(), 0.0001, format="%0.4f")
+            session.x.lo, session.x.max, session.x.hi, 0.0001, format="%0.4f")
 
         # Spacer
         st.markdown("#")
@@ -575,31 +551,42 @@ else:
         st.markdown("#")
 
         # Settings for y threshold
-        st.session_state["y_lo"], st.session_state["y_hi"] = st.slider(
+        session.y.lo, session.y.hi = st.slider(
             'Y threshold',
-            y_min(), y_max(), y_interval(2), 0.01, format="%0.4f")
+            session.y.min, session.y.max, session.y.interval(1), 0.01, format="%0.4f")
 
-        st.session_state["y_lo"] = st.number_input(
+        session.y.lo = st.number_input(
             'Y Lower Threshold',
-            y_min(), y_hi(), y_lo(), 0.0001, format="%0.4f")
-        st.session_state["y_hi"] = st.number_input(
+            session.y.min, session.y.hi, session.y.lo, 0.0001, format="%0.4f")
+
+        session.y.hi = st.number_input(
             'Y Higher Threshold',
-            y_lo(), y_max(), y_hi(), 0.0001, format="%0.4f")
+            session.y.lo, session.y.max, session.y.hi, 0.0001, format="%0.4f")
 
         # on change, change the lines.
         #st.write('Values:', values) # and then we can add on the % etc.
 
     with gcol2:
+        # TODO remove width stuff?
         graph_container = st.container()
-        x = data[inputs[0]]
-        y = data[outputs[0]]
-        fig = get_fig(x, y)
+        #x = data[inputs[0]]
+        #y = data[outputs[0]]
+        fig = get_threshold_graph()
         #fig.update_layout(autosize=False, height=800)
         # Set up some reasonable margins and heights so we actually get a more square-like graph
         # rather than the wide boi streamlit wants it to be
         fig.layout.height=1000
         fig.layout.margin=dict(l=100, r=100, t=0, b=0)
         graph_container.plotly_chart(fig, use_container_width=True)
+
+    with gcol3:
+        table_container = st.container()
+        table_ns, table_ps = get_threshold_tables()
+        table_container.markdown("### Threshold Areas")
+        table_container.plotly_chart(table_ns, use_container_width=True)
+        table_container.markdown("### Threshold Area Percentages")
+        table_container.plotly_chart(table_ps, use_container_width=True)
+
 
 st.session_state
 
