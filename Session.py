@@ -2,7 +2,9 @@ import numpy as np
 from collections import namedtuple
 
 class Variable:
-    def __init__(self):
+    def __init__(self, name, state):
+        self.name = name
+        self.state = state
         self.data = None
         self.col = None
         self.mean = None
@@ -11,6 +13,7 @@ class Variable:
         self.max = None
         self.lo = None
         self.hi = None
+        print(self.state)
 
     def update(self, data):
         # Update the given variable's attributes, assuming the col it represents has changed
@@ -20,6 +23,7 @@ class Variable:
         # data[col] data.
 
         self.data = data[self.col]
+        # TODO we need a case here for if data is non-numeric, what to do?
         self.mean = np.mean(self.data)
         self.std = np.std(self.data)
         self.min = np.amin(self.data)
@@ -33,16 +37,46 @@ class Variable:
         print("max: ", self.max)
         print("lo: ", self.lo)
         print("hi: ", self.hi)
+        print()
 
+    def __getattribute__(self, item):
+        # Get from session state
+        #self.item = self.state[item]
+        # Update our own value with whatever session state has
+        #self.__setattr__(item, self.state[item])
+        if item not in ["data", "col", "mean", "std", "min", "max", "lo", "hi"]:
+            # don't do this for state, since that's infinite recursion
+            return super().__getattribute__(item)
+        item = self.name + "_" + item
+        if item == "x_lo":
+            print("getting x_lo", self.state[item])
+        #print(f"{item} = self.state[{item}]")
+        #eval(f"{item} = self.state[{item}]")
+        self.__setattr__(item, self.state[item])
+        return self.state[item]
+
+    def __setattr__(self, key, value):
+        if key not in ["data", "col", "mean", "std", "min", "max", "lo", "hi"]:
+            # don't do this for state, since that's infinite recursion
+            super().__setattr__(key, value)
+            return
+
+        key = self.name + "_" + key
+
+        # Set into session state and class state.
+        self.state[key] = value
+        super().__setattr__(key, value)
 
     def interval(self, i):
         #self.update(var)
         #print(var.std)
-        return [float(self.mean-i*self.std), float(self.mean+i*self.std)]
+        lo = float(max(self.min, self.mean - i * self.std))
+        hi = float(min(self.max, self.mean + i * self.std))
+        return [lo,hi]
 
 
 class Session:
-    def __init__(self, data):
+    def __init__(self, data, state):
         """
         Class for managing session variables and functions throughout usage of quicksilver,
             including the dataset they filter through and the operations chosen.
@@ -57,9 +91,9 @@ class Session:
         # Init all session variables
         self.data = data
 
-        #var = namedtuple("var", "data col mean std min max lo hi interval", defaults=[None, None, None, None, None, None, None, None, None])
-        self.x = Variable()
-        self.y = Variable()
+        self.x = Variable("x", state)
+        self.y = Variable("y", state)
+        self.scatter_enable = False
 
 
         # TODO do we need this?
@@ -74,4 +108,3 @@ class Session:
 
 
 
-test = Session("asdf")

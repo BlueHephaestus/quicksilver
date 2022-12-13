@@ -158,6 +158,8 @@ def update_data():
 
     data_non_numerical = data[cols_non_numerical]
     data = data[cols_numerical]
+    # Convert all numerical columns to matching datatype to avoid problems in later use.
+    data = data.astype(np.float64)
 
     mean = data.mean()
     std = data.std()
@@ -333,23 +335,13 @@ with col2:
 
 "# Data Visualization & Analysis"
 "Using the above dataframe, you can now visualize and analyse the resulting data however you like."
-"Lets just start with one var each."
 
 data = st.session_state["data"]
-session = Session(data)
-#x = data["C24:0"]
-#y = data["C26:0"]
-@st.cache
-def get_x():
-    return np.random.randn(10000)
+session = Session(data, st.session_state)
 
-@st.cache
-def get_y():
-    return np.random.randn(10000)
+gfcol1, gfcol2 = st.columns(2)
 
-_1, _2 = st.columns(2)
-
-gcol1, gcol2, gcol3 = st.columns((1,2,1), gap="large")
+gcol1x, gcol1y, gcol2, gcol3 = st.columns((1,1,4,2), gap="large")
 
 
 
@@ -357,26 +349,48 @@ gcol1, gcol2, gcol3 = st.columns((1,2,1), gap="large")
 def get_threshold_graph():
     #x = get_x()
     #y = get_y()
-    fig = go.Figure(
-        data=[
-            go.Histogram2d(
-                x=session.x.data,
-                y=session.y.data,
-                nbinsx=400,
-                nbinsy=400,
-                colorscale="Blues",
-                colorbar=dict(tickfont=dict(size=30)),
-            )
-        ],
-        layout_height=800,
-    )
+    accessions = data_master["EpisodeNumber"]
+    if session.scatter_enable:
+        # Scatterplot
+        hovertemplate="<b>%{customdata}</b><br>" + session.x.col + ": %{x}<br>" + session.y.col + ": %{y}<br><extra></extra>"
+        fig = go.Figure(
+            data=[
+                go.Scatter(
+                    x=session.x.data,
+                    y=session.y.data,
+                    mode="markers",
+                    customdata=accessions,
+                    hovertemplate=hovertemplate
+                )
+            ],
+            layout_height=800,
+        )
+    else:
+        # Histogram
+        # oi future self not sure how or if we can have accessions on the histogram2d points
+        hovertemplate="<b>%{x>45}</b><br>" + session.x.col + ": %{x}<br>" + session.y.col + ": %{y}<br><extra></extra>"
+        fig = go.Figure(
+            data=[
+                go.Histogram2d(
+                    x=session.x.data,
+                    y=session.y.data,
+                    nbinsx=400,
+                    nbinsy=400,
+                    customdata=accessions,
+                    hovertemplate=hovertemplate,
+                    colorscale="Blues",
+                    colorbar=dict(tickfont=dict(size=30)),
+                )
+            ],
+            layout_height=800,
+        )
 
     # Set these up to be changing relative to the session state values, which change as the slider changes.
     # TODO: can make shift into x and y and make it relative to the size of the vrect and hrect if we want
     shift = 0
     fontsize = 30
-    fig.update_xaxes(showgrid=False, tickfont=dict(size=fontsize))
-    fig.update_yaxes(showgrid=False, tickfont=dict(size=fontsize))
+    fig.update_xaxes(showgrid=False, title=session.x.col, titlefont=dict(size=fontsize), tickfont=dict(size=fontsize))
+    fig.update_yaxes(showgrid=False, title=session.y.col, titlefont=dict(size=fontsize), tickfont=dict(size=fontsize))
 
     #print(session.x.min,session.x.max)
     #st.session_state["x_thresh"] = x_interval(2)
@@ -392,7 +406,7 @@ def get_threshold_graph():
     # for some reason need an extra buffer for the minimum x one.
     fig.add_vrect(x0=session.x.min-session.x.std, x1=session.x.lo, fillcolor="blue", opacity=.2)
     fig.add_vrect(x0=session.x.hi, x1=session.x.max, fillcolor="blue", opacity=.2)
-    fig.add_hrect(y0=session.y.min, y1=session.y.lo, fillcolor="red", opacity=.2)
+    fig.add_hrect(y0=session.y.min-session.y.std, y1=session.y.lo, fillcolor="red", opacity=.2)
     fig.add_hrect(y0=session.y.hi, y1=session.y.max, fillcolor="red", opacity=.2)
 
 
@@ -400,18 +414,6 @@ def get_threshold_graph():
 
 def get_threshold_tables():
     # Get 3x3 tables for the areas in each of our sections in our threshold graph.
-
-
-    # Compute center of all octants so we can put annotations directly in the middle of them.
-    # Several of these are simplified to avoid repeated calls to session.y.hi session.x.lo and so on.
-    # e.g. (y_max-session.y.hi)/4 + session.y.hi => y_max/4 - session.y.hi/4 + session.y.hi => y_max/4 + 3*session.y.hi/4
-    # e.g. (x_max - session.x.hi)/2 + session.x.hi => x_max/2 - session.x.hi/2 + session.x.hi => x_max/2 + session.x.hi/2
-    left = session.x.lo/2 + session.x.min/2
-    top = session.y.max/4 + 3*session.y.hi/4 # smaller because of height of text, hence /4
-    right = session.x.max/2 + session.x.hi/2
-    bot = session.y.lo/4 + 3*session.y.min/4
-    mid_x = session.x.hi/2 + session.x.lo/2
-    mid_y = session.y.hi/2 + session.y.lo/2
 
     # Compute values for all octants for the text to go in each - # of values inside and % of values inside.
     # We create masks for each to avoid having to repeat our calculations for the corners, where we AND them together.
@@ -432,10 +434,6 @@ def get_threshold_tables():
     mask_p = lambda m: round(mask_n(m)/n*100., 4) # compute % of whole in masked area
     mask_and_p = lambda m1, m2: round(mask_and_n(m1, m2)/n*100., 4) # compute % of whole in intersecting masked area
 
-    # Combine both into larger easier to reference one
-    mask_stats = lambda m: (mask_n(m), mask_p(m))
-    mask_and_stats = lambda m1,m2: (mask_and_n(m1,m2), mask_and_p(m1,m2))
-
     # Given this, now we can assemble the 9 values
     grid_ns = [
         [mask_and_n(mask_x_lo, mask_y_hi), mask_n(mask_y_hi), mask_and_n(mask_x_hi, mask_y_hi)],
@@ -453,25 +451,6 @@ def get_threshold_tables():
             grid_ns[i][j] = " <br>" + str(grid_ns[i][j])
             grid_ps[i][j] = " <br>" + str(grid_ps[i][j])
 
-    # # Format string lambda
-    # grid_str = lambda i,j: f"{grid[i][j][0]}, {grid[i][j][1]}%"
-    #
-    # # Finally put all the values in
-    # fig.add_annotation(x=left, y=top, text=grid_str(0,0), font=dict(size=fontsize))
-    # fig.add_annotation(x=mid_x, y=top, text=grid_str(0,1), font=dict(size=fontsize))
-    # fig.add_annotation(x=right, y=top, text=grid_str(0,2), font=dict(size=fontsize))
-    #
-    # fig.add_annotation(x=left, y=mid_y, text=grid_str(1,0), font=dict(size=fontsize))
-    # fig.add_annotation(x=mid_x, y=mid_y, text=grid_str(1,1), font=dict(size=fontsize))
-    # fig.add_annotation(x=right, y=mid_y, text=grid_str(1,2), font=dict(size=fontsize))
-    #
-    # fig.add_annotation(x=left, y=bot, text=grid_str(2,0), font=dict(size=fontsize))
-    # fig.add_annotation(x=mid_x, y=bot, text=grid_str(2,1), font=dict(size=fontsize))
-    # fig.add_annotation(x=right, y=bot, text=grid_str(2,2), font=dict(size=fontsize))
-    # fig = go.Figure(data=[go.Table(
-    #     header=dict(values=[1,2,3]),
-    #     cells=dict(values=np.random.randn(9).reshape((3,3)), height=40),
-    # )])
     red = "#f9c9cc"
     blue = "#c6c9ff"
     purple = "#d1a1cc"
@@ -504,91 +483,118 @@ def get_threshold_tables():
     fig_ps.update_layout(font_size=32, margin=dict(t=10, b=10))
     return fig_ns, fig_ps
 
-with _1:
-    inputs = st.multiselect("Input / Independent Variables: ", data.columns)
-    outputs = st.multiselect("Output / Dependent Variables: ", [col for col in data.columns if col not in inputs])
-with _2:
+#print([data[col].dtype for col in data.columns])
+numeric_cols = [col for col in data.columns if np.issubdtype(data[col].dtype, np.number)]
+with gfcol1:
+    # Only allow choice of numeric columns, for now.
+    session.x.col = st.selectbox("Input / Independent Variables: ", numeric_cols)
+    session.y.col = st.selectbox("Output / Dependent Variables: ", [col for col in numeric_cols if col != session.x.col])
+    session.scatter_enable = st.checkbox("Render graph as scatterplot instead of histogram (this will lower performance)")
+with gfcol2:
     st.markdown("#")
-    #st.button("GENERATE GRAPH", on_click=generate_graph, args=(inputs[0], outputs[0]))
+    #st.button("GENERATE GRAPH", on_click=lambda x:x, args=(input, output))
 
 #def generate_graph(x_label,y_label):
 #x = data[inputs[0]]
 #y = data[outputs[0]]
 
+# TODO set this up so that they have to press update to update the graph?
 # If the user hasn't specified values for this, then don't show anything yet.
-if len(inputs) == 0 or len(outputs) == 0:
-    # Not enough values, specify text for this.
-    st.markdown("### Not enough values specified; select an input and and output variable to generate a graph.")
 
-else:
+# Update these attributes when we have columns for them
+#session.x.col = input
+#session.y.col = output
+session.x.update(session.data)
+session.y.update(session.data)
+#session.x.print()
 
-    # Update these attributes when we have columns for them
-    session.x.col = inputs[0]
-    session.y.col = outputs[0]
+xname = session.x.col
+yname = session.y.col
+mask_n = lambda m: np.sum(m)/len(m)*100  # compute % in masked area
+#lambda perc2num()
+perc2num = lambda data, p: np.percentile(data, p)
+num2perc = lambda data, n: np.sum(data < n)/len(data)*100
+
+
+# PROBLEM: TODO: Updates to values in later widgets don't update earlier ones. if i change the number it doesn't move slider.
+# Unfortunately this is a limitation of streamlit, and can't be fixed yet. Fortuantely, it still changes the graph.
+with gcol1x:
+    def callback(attr):
+        print(st.session_state[attr])
+    # Settings for x threshold
+    st.session_state["x_lo"], session.x.hi = st.slider(
+        f'{xname} threshold',
+        session.x.min, session.x.max, session.x.interval(2), 0.01, format="%0.4f")
+
+    # Can also be controlled with more granularity
+    #print(st.session_state.name)
+    print(st.session_state["x_lo"])
+    st.session_state["x_lo"] = st.number_input(
+        f'{xname} Lower Threshold',
+        session.x.min, session.x.hi, st.session_state["x_lo"], 0.0001, on_change=lambda: print('ref: ', st.session_state["x_lo"]), format="%0.4f")
+    session.x.hi = st.number_input(
+        f'{xname} Higher Threshold',
+        session.x.lo, session.x.max, session.x.hi, 0.0001, format="%0.4f")
+
+    # And via percentiles
+    #print(session.x.lo, mask_n(mask_x_lo), len(mask_x_lo))
+    session.x.lo = perc2num(session.x.data, st.number_input(
+        f'{xname} Lower Threshold (Percentile)',
+        0., 100., num2perc(session.x.data, session.x.lo), .1, format="%.2f"))#Streamlit does not allow % symbol here
+    session.x.hi = perc2num(session.x.data, st.number_input(
+        f'{xname} Higher Threshold (Percentile)',
+        0., 100., num2perc(session.x.data, session.x.hi), .1, format="%.2f"))
+
     session.x.update(session.data)
     session.y.update(session.data)
-    session.x.print()
+    #session.x.lo =  xlo_p)
 
-    with gcol1:
-        # Settings for x threshold
-        session.x.lo, session.x.hi = st.slider(
-            'X threshold',
-            session.x.min, session.x.max, session.x.interval(1), 0.01, format="%0.4f")
-        session.x.print()
+with gcol1y:
+    # Spacer
+    # st.markdown("#")
+    # st.markdown("#")
+    # st.markdown("#")
+    # st.markdown("#")
 
-        # Can also be controlled with more granularity
-        session.x.lo = st.number_input(
-            'X Lower Threshold',
-            session.x.min, session.x.hi, session.x.lo, 0.0001, format="%0.4f")
-        session.x.hi = st.number_input(
-            'X Higher Threshold',
-            session.x.lo, session.x.max, session.x.hi, 0.0001, format="%0.4f")
+    # Settings for y threshold
+    session.y.lo, session.y.hi = st.slider(
+        f'{yname} threshold',
+        session.y.min, session.y.max, session.y.interval(2), 0.01, format="%0.4f")
 
-        # Spacer
-        st.markdown("#")
-        st.markdown("#")
-        st.markdown("#")
-        st.markdown("#")
+    session.y.lo = st.number_input(
+        f'{yname} Lower Threshold',
+        session.y.min, session.y.hi, session.y.lo, 0.0001, format="%0.4f")
 
-        # Settings for y threshold
-        session.y.lo, session.y.hi = st.slider(
-            'Y threshold',
-            session.y.min, session.y.max, session.y.interval(1), 0.01, format="%0.4f")
+    session.y.hi = st.number_input(
+        f'{yname} Higher Threshold',
+        session.y.lo, session.y.max, session.y.hi, 0.0001, format="%0.4f")
 
-        session.y.lo = st.number_input(
-            'Y Lower Threshold',
-            session.y.min, session.y.hi, session.y.lo, 0.0001, format="%0.4f")
+    # on change, change the lines.
+    #st.write('Values:', values) # and then we can add on the % etc.
 
-        session.y.hi = st.number_input(
-            'Y Higher Threshold',
-            session.y.lo, session.y.max, session.y.hi, 0.0001, format="%0.4f")
+with gcol2:
+    # TODO remove width stuff?
+    graph_container = st.container()
+    #x = data[inputs[0]]
+    #y = data[outputs[0]]
+    fig = get_threshold_graph()
+    #fig.update_layout(autosize=False, height=800)
+    # Set up some reasonable margins and heights so we actually get a more square-like graph
+    # rather than the wide boi streamlit wants it to be
+    fig.layout.height=1000
+    fig.layout.margin=dict(l=100, r=100, t=0, b=0)
+    graph_container.plotly_chart(fig, use_container_width=True)
 
-        # on change, change the lines.
-        #st.write('Values:', values) # and then we can add on the % etc.
-
-    with gcol2:
-        # TODO remove width stuff?
-        graph_container = st.container()
-        #x = data[inputs[0]]
-        #y = data[outputs[0]]
-        fig = get_threshold_graph()
-        #fig.update_layout(autosize=False, height=800)
-        # Set up some reasonable margins and heights so we actually get a more square-like graph
-        # rather than the wide boi streamlit wants it to be
-        fig.layout.height=1000
-        fig.layout.margin=dict(l=100, r=100, t=0, b=0)
-        graph_container.plotly_chart(fig, use_container_width=True)
-
-    with gcol3:
-        table_container = st.container()
-        table_ns, table_ps = get_threshold_tables()
-        table_container.markdown("### Threshold Areas")
-        table_container.plotly_chart(table_ns, use_container_width=True)
-        table_container.markdown("### Threshold Area Percentages")
-        table_container.plotly_chart(table_ps, use_container_width=True)
+with gcol3:
+    table_container = st.container()
+    table_ns, table_ps = get_threshold_tables()
+    table_container.markdown("### Threshold Areas")
+    table_container.plotly_chart(table_ns, use_container_width=True)
+    table_container.markdown("### Threshold Area Percentages")
+    table_container.plotly_chart(table_ps, use_container_width=True)
 
 
-st.session_state
+#st.session_state
 
 # """#### This file will be used for input to the upcoming analysis.
 # If you wish to change it, do so above.
