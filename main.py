@@ -185,11 +185,23 @@ def update_data():
     # print(data[data["C24:0"].isnull()])
     # print(data[data["C24:0"].isna()])
 
-    ##### OUTLIER HANDLING #####
-    if st.session_state["outlier_opt"]:
-        # We don't apply anything here yet,
-        # this is just for us getting the method to use later when making the graphing setup
-        pass
+    ##### LOGARITHMIC SCALING #####
+    match st.session_state["log_opt"]:
+        case "None (default)":
+            # what did you expect?
+            pass
+
+        case "Log Base 10":
+            for col in data:
+                data[col] = np.log10(data[col])
+
+        case "Log Base 2":
+            for col in data:
+                data[col] = np.log2(data[col])
+
+        case "Log Base e (natural log)":
+            for col in data:
+                data[col] = np.log(data[col])
 
     ##### SCALING / NORMALIZATION #####
     match st.session_state["scaling_opt"]:
@@ -233,10 +245,6 @@ def update_data():
         case "None (default)":
             # lookin' sus
             pass
-
-        case "Log Scaling (base 10)":
-            for col in data:
-                data[col] = np.log10(data[col])
 
         case "Yeo-Johnson":
             for col in data:
@@ -303,14 +311,13 @@ with col2:
          "Replace with Mean Value",
          "Replace with Median Value",
          ))
-    st.session_state["outlier_opt"] = st.selectbox(
-        "Outlier Handling (Choose only the Method, Parameters are chosen in the 'Data Visualization' section)",
-        ("Value Thresholds (default)",
-         "Percentage Thresholds",
-         "Quantiles",
-         "Multiple of Standard-Deviation",
-         "Do Nothing",
-         ), disabled=True)
+    st.session_state["log_opt"] = st.selectbox(
+        "Logarithmic Scaling Method",
+        ("None (default)",
+         "Log Base 10",
+         "Log Base 2",
+         "Log Base e (natural log)",
+         ))
     st.session_state["scaling_opt"] = st.selectbox(
         "Scaling / Normalization Method",
         ("None (default)",
@@ -324,7 +331,6 @@ with col2:
     st.session_state["transformation_opt"] = st.selectbox(
         "Data Transformations (Make sure your data is in the correct ranges for your chosen transform)",
         ("None (default)",
-         "Log Scaling (base 10)",
          "Yeo-Johnson",
          "Box-Cox (Only applied to columns with all positive values, otherwise columns will be skipped)",
          ))
@@ -515,61 +521,74 @@ mask_n = lambda m: np.sum(m)/len(m)*100  # compute % in masked area
 perc2num = lambda data, p: np.percentile(data, p)
 num2perc = lambda data, n: np.sum(data < n)/len(data)*100
 
-
+error_msg_template = """
+Tried to render graph of column {}, but encountered the following error.
+Remember that changes made to the dataset don't propagate until the Update Data button is clicked,
+and make sure you haven't applied transformations on columns that result in undefined data! (e.g. logarithm of negative numbers).
+"""
 # PROBLEM: TODO: Updates to values in later widgets don't update earlier ones. if i change the number it doesn't move slider.
 # Unfortunately this is a limitation of streamlit, and can't be fixed yet. Fortuantely, it still changes the graph.
-with gcol1x:
-    # Settings for x threshold
-    session.x.lo, session.x.hi = st.slider(
-        f'{xname} threshold',
-        session.x.min, session.x.max, session.x.interval(2), 0.01, format="%0.4f")
+try:
+    with gcol1x:
+        # Settings for x threshold
+        session.x.lo, session.x.hi = st.slider(
+            f'{xname} threshold',
+            session.x.min, session.x.max, session.x.interval(2), 0.01, format="%0.4f")
 
-    # Can also be controlled with more granularity
-    session.x.lo = st.number_input(
-        f'{xname} Lower Threshold',
-        session.x.min, session.x.hi, session.x.lo, 0.0001, format="%0.4f")
-    session.x.hi = st.number_input(
-        f'{xname} Higher Threshold',
-        session.x.lo, session.x.max, session.x.hi, 0.0001, format="%0.4f")
+        # Can also be controlled with more granularity
+        session.x.lo = st.number_input(
+            f'{xname} Lower Threshold',
+            session.x.min, session.x.hi, session.x.lo, 0.0001, format="%0.4f")
+        session.x.hi = st.number_input(
+            f'{xname} Higher Threshold',
+            session.x.lo, session.x.max, session.x.hi, 0.0001, format="%0.4f")
 
-    # And via percentiles
-    session.x.lo = perc2num(session.x.data, st.number_input(
-        f'{xname} Lower Threshold (Percentile)',
-        0., num2perc(session.x.data, session.x.hi), num2perc(session.x.data, session.x.lo), .1, format="%.2f"))#Streamlit does not allow % symbol here
-    session.x.hi = perc2num(session.x.data, st.number_input(
-        f'{xname} Higher Threshold (Percentile)',
-        num2perc(session.x.data, session.x.lo), 100., num2perc(session.x.data, session.x.hi), .1, format="%.2f"))
+        # And via percentiles
+        session.x.lo = perc2num(session.x.data, st.number_input(
+            f'{xname} Lower Threshold (Percentile)',
+            0., num2perc(session.x.data, session.x.hi), num2perc(session.x.data, session.x.lo), .1, format="%.2f"))#Streamlit does not allow % symbol here
+        session.x.hi = perc2num(session.x.data, st.number_input(
+            f'{xname} Higher Threshold (Percentile)',
+            num2perc(session.x.data, session.x.lo), 100., num2perc(session.x.data, session.x.hi), .1, format="%.2f"))
+except st.errors.StreamlitAPIException:
+    if "x_lo" not in st.session_state:
+        # First time running this, update the data so we get something started.
+        update_data()
+    st.write(error_msg_template.format(xname))
 
-with gcol1y:
-    # Spacer
-    # st.markdown("#")
-    # st.markdown("#")
-    # st.markdown("#")
-    # st.markdown("#")
+try:
+    with gcol1y:
+        # Spacer
+        # st.markdown("#")
+        # st.markdown("#")
+        # st.markdown("#")
+        # st.markdown("#")
 
-    # Settings for y threshold
-    session.y.lo, session.y.hi = st.slider(
-        f'{yname} threshold',
-        session.y.min, session.y.max, session.y.interval(2), 0.01, format="%0.4f")
+        # Settings for y threshold
+        session.y.lo, session.y.hi = st.slider(
+            f'{yname} threshold',
+            session.y.min, session.y.max, session.y.interval(2), 0.01, format="%0.4f")
 
-    session.y.lo = st.number_input(
-        f'{yname} Lower Threshold',
-        session.y.min, session.y.hi, session.y.lo, 0.0001, format="%0.4f")
+        session.y.lo = st.number_input(
+            f'{yname} Lower Threshold',
+            session.y.min, session.y.hi, session.y.lo, 0.0001, format="%0.4f")
 
-    session.y.hi = st.number_input(
-        f'{yname} Higher Threshold',
-        session.y.lo, session.y.max, session.y.hi, 0.0001, format="%0.4f")
+        session.y.hi = st.number_input(
+            f'{yname} Higher Threshold',
+            session.y.lo, session.y.max, session.y.hi, 0.0001, format="%0.4f")
 
-    # And via percentiles
-    session.y.lo = perc2num(session.y.data, st.number_input(
-        f'{yname} Lower Threshold (Percentile)',
-        0., num2perc(session.y.data, session.y.hi), num2perc(session.y.data, session.y.lo), .1, format="%.2f"))#Streamlit does not allow % symbol here
-    session.y.hi = perc2num(session.y.data, st.number_input(
-        f'{yname} Higher Threshold (Percentile)',
-        num2perc(session.y.data, session.y.lo), 100., num2perc(session.y.data, session.y.hi), .1, format="%.2f"))
+        # And via percentiles
+        session.y.lo = perc2num(session.y.data, st.number_input(
+            f'{yname} Lower Threshold (Percentile)',
+            0., num2perc(session.y.data, session.y.hi), num2perc(session.y.data, session.y.lo), .1, format="%.2f"))#Streamlit does not allow % symbol here
+        session.y.hi = perc2num(session.y.data, st.number_input(
+            f'{yname} Higher Threshold (Percentile)',
+            num2perc(session.y.data, session.y.lo), 100., num2perc(session.y.data, session.y.hi), .1, format="%.2f"))
 
-    # on change, change the lines.
-    #st.write('Values:', values) # and then we can add on the % etc.
+        # on change, change the lines.
+        #st.write('Values:', values) # and then we can add on the % etc.
+except st.errors.StreamlitAPIException:
+    st.write(error_msg_template.format(yname))
 
 with gcol2:
     # TODO remove width stuff?
