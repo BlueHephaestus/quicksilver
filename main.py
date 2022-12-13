@@ -337,7 +337,7 @@ with col2:
 "Using the above dataframe, you can now visualize and analyse the resulting data however you like."
 
 data = st.session_state["data"]
-session = Session(data, st.session_state)
+session = Session(data)
 
 gfcol1, gfcol2 = st.columns(2)
 
@@ -368,7 +368,7 @@ def get_threshold_graph():
     else:
         # Histogram
         # oi future self not sure how or if we can have accessions on the histogram2d points
-        hovertemplate="<b>%{x>45}</b><br>" + session.x.col + ": %{x}<br>" + session.y.col + ": %{y}<br><extra></extra>"
+        hovertemplate="<b>Population: %{z}</b><br>" + session.x.col + ": %{x}<br>" + session.y.col + ": %{y}<br><extra></extra>"
         fig = go.Figure(
             data=[
                 go.Histogram2d(
@@ -519,35 +519,26 @@ num2perc = lambda data, n: np.sum(data < n)/len(data)*100
 # PROBLEM: TODO: Updates to values in later widgets don't update earlier ones. if i change the number it doesn't move slider.
 # Unfortunately this is a limitation of streamlit, and can't be fixed yet. Fortuantely, it still changes the graph.
 with gcol1x:
-    def callback(attr):
-        print(st.session_state[attr])
     # Settings for x threshold
-    st.session_state["x_lo"], session.x.hi = st.slider(
+    session.x.lo, session.x.hi = st.slider(
         f'{xname} threshold',
         session.x.min, session.x.max, session.x.interval(2), 0.01, format="%0.4f")
 
     # Can also be controlled with more granularity
-    #print(st.session_state.name)
-    print(st.session_state["x_lo"])
-    st.session_state["x_lo"] = st.number_input(
+    session.x.lo = st.number_input(
         f'{xname} Lower Threshold',
-        session.x.min, session.x.hi, st.session_state["x_lo"], 0.0001, on_change=lambda: print('ref: ', st.session_state["x_lo"]), format="%0.4f")
+        session.x.min, session.x.hi, session.x.lo, 0.0001, format="%0.4f")
     session.x.hi = st.number_input(
         f'{xname} Higher Threshold',
         session.x.lo, session.x.max, session.x.hi, 0.0001, format="%0.4f")
 
     # And via percentiles
-    #print(session.x.lo, mask_n(mask_x_lo), len(mask_x_lo))
     session.x.lo = perc2num(session.x.data, st.number_input(
         f'{xname} Lower Threshold (Percentile)',
-        0., 100., num2perc(session.x.data, session.x.lo), .1, format="%.2f"))#Streamlit does not allow % symbol here
+        0., num2perc(session.x.data, session.x.hi), num2perc(session.x.data, session.x.lo), .1, format="%.2f"))#Streamlit does not allow % symbol here
     session.x.hi = perc2num(session.x.data, st.number_input(
         f'{xname} Higher Threshold (Percentile)',
-        0., 100., num2perc(session.x.data, session.x.hi), .1, format="%.2f"))
-
-    session.x.update(session.data)
-    session.y.update(session.data)
-    #session.x.lo =  xlo_p)
+        num2perc(session.x.data, session.x.lo), 100., num2perc(session.x.data, session.x.hi), .1, format="%.2f"))
 
 with gcol1y:
     # Spacer
@@ -568,6 +559,14 @@ with gcol1y:
     session.y.hi = st.number_input(
         f'{yname} Higher Threshold',
         session.y.lo, session.y.max, session.y.hi, 0.0001, format="%0.4f")
+
+    # And via percentiles
+    session.y.lo = perc2num(session.y.data, st.number_input(
+        f'{yname} Lower Threshold (Percentile)',
+        0., num2perc(session.y.data, session.y.hi), num2perc(session.y.data, session.y.lo), .1, format="%.2f"))#Streamlit does not allow % symbol here
+    session.y.hi = perc2num(session.y.data, st.number_input(
+        f'{yname} Higher Threshold (Percentile)',
+        num2perc(session.y.data, session.y.lo), 100., num2perc(session.y.data, session.y.hi), .1, format="%.2f"))
 
     # on change, change the lines.
     #st.write('Values:', values) # and then we can add on the % etc.

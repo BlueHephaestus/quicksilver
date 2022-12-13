@@ -1,10 +1,7 @@
 import numpy as np
-from collections import namedtuple
 
 class Variable:
-    def __init__(self, name, state):
-        self.name = name
-        self.state = state
+    def __init__(self):
         self.data = None
         self.col = None
         self.mean = None
@@ -13,7 +10,6 @@ class Variable:
         self.max = None
         self.lo = None
         self.hi = None
-        print(self.state)
 
     def update(self, data):
         # Update the given variable's attributes, assuming the col it represents has changed
@@ -39,34 +35,6 @@ class Variable:
         print("hi: ", self.hi)
         print()
 
-    def __getattribute__(self, item):
-        # Get from session state
-        #self.item = self.state[item]
-        # Update our own value with whatever session state has
-        #self.__setattr__(item, self.state[item])
-        if item not in ["data", "col", "mean", "std", "min", "max", "lo", "hi"]:
-            # don't do this for state, since that's infinite recursion
-            return super().__getattribute__(item)
-        item = self.name + "_" + item
-        if item == "x_lo":
-            print("getting x_lo", self.state[item])
-        #print(f"{item} = self.state[{item}]")
-        #eval(f"{item} = self.state[{item}]")
-        self.__setattr__(item, self.state[item])
-        return self.state[item]
-
-    def __setattr__(self, key, value):
-        if key not in ["data", "col", "mean", "std", "min", "max", "lo", "hi"]:
-            # don't do this for state, since that's infinite recursion
-            super().__setattr__(key, value)
-            return
-
-        key = self.name + "_" + key
-
-        # Set into session state and class state.
-        self.state[key] = value
-        super().__setattr__(key, value)
-
     def interval(self, i):
         #self.update(var)
         #print(var.std)
@@ -76,7 +44,7 @@ class Variable:
 
 
 class Session:
-    def __init__(self, data, state):
+    def __init__(self, data):
         """
         Class for managing session variables and functions throughout usage of quicksilver,
             including the dataset they filter through and the operations chosen.
@@ -91,8 +59,8 @@ class Session:
         # Init all session variables
         self.data = data
 
-        self.x = Variable("x", state)
-        self.y = Variable("y", state)
+        self.x = Variable()
+        self.y = Variable()
         self.scatter_enable = False
 
 
