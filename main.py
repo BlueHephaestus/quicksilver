@@ -22,6 +22,7 @@ from Constants import *
 from sessions import *
 from graphs import *
 from tables import *
+from loaders import *
 import sys, traceback
 st.set_page_config(page_title="Quicksilver", layout="wide")
 
@@ -72,28 +73,11 @@ st.markdown("""<style>div.stButton > button:first-child {
 
 "# Data Preparation"
 
-input_file = st.file_uploader("Choose a file for Population Analysis. If no file is chosen, the default will be used.", type=["txt","csv"])
-
-#@st.cache(allow_output_mutation=True) # dont enable, this is a problem for now
-
-@st.cache()
-def read_input_file():
-    print("Reading input file from disk...")
-    if input_file is not None:
-        try:
-            # Note: Streamlit doesn't let you rename the index easily, it shows in other apps but not streamlit.
-            raw_data = pd.read_csv(input_file, index_col=0)
-            return raw_data, input_file
-        except:
-            "Unable to load file. Did you make sure it was a CSV formatted file?"
-            sys.exit()
-    else:
-        raw_data = pd.read_csv(DEFAULT_INPUT_FILE, index_col=0)
-        return raw_data, DEFAULT_INPUT_FILE
+input_file = st.file_uploader("Choose file(s) for Population Analysis. If no file(s) is chosen, the default will be used.", accept_multiple_files=True, type=["txt","csv","xls","xlsx"])
 
 # DO NOT MODIFY DATA_REF, ONLY DE-REFERENCE TO GET OUR DATAFRAME FOR USE IN THE FUNCTION
 # OTHERWISE WE CAN'T CACHE IT FOR LATER USE ON RE-RUNS
-data_master, data_fname = read_input_file()
+data_master, data_fname = load_input_data(input_file)
 data = data_master.copy()
 
 if len(st.session_state.keys()) < 4:
@@ -112,7 +96,6 @@ data_container = st.empty()
 data_container.container().write(st.session_state["data"])
 
 ##### DATA PREPARATION AND MODIFICATION TIME #####
-
 def update_data():
     """
     This way we ONLY UPDATE THE DATAFRAME AND RUN THOSE COSTLY FUNCTIONS ONCE WE'RE SURE
@@ -273,8 +256,6 @@ def update_data():
 #with st.form("data_prep"):
 col1,col2 = st.columns(2)
 with col1:
-    #st.markdown("<u><b>Columns Filtering<b></u>", unsafe_allow_html=True)
-    #st.write("Columns Filtering")
     ##### HEADERS #####
     # Choice of all headers to include in resulting dataset.
     container = st.container()  # lets us have these out of order displayed but affect each other
