@@ -20,10 +20,10 @@ class Variable:
 
         self.data = data[self.col]
         # TODO we need a case here for if data is non-numeric, what to do?
-        self.mean = np.mean(self.data)
-        self.std = np.std(self.data)
-        self.min = np.amin(self.data)
-        self.max = np.amax(self.data)
+        self.mean = float(np.mean(self.data))
+        self.std = float(np.std(self.data))
+        self.min = float(np.amin(self.data))
+        self.max = float(np.amax(self.data))
 
     def print(self):
         print("col: ", self.col)

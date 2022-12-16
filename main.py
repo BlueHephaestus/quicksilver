@@ -15,12 +15,14 @@ though i did just test it and it isn't loading at all so long as we have the st.
 import streamlit as st
 import numpy as np
 import pandas as pd
-from Session import *
 from scipy import stats
 from cross_referencing import *
 from sklearn.preprocessing import power_transform
-import plotly.graph_objects as go
-import sys
+from Constants import *
+from sessions import *
+from graphs import *
+from tables import *
+import sys, traceback
 st.set_page_config(page_title="Quicksilver", layout="wide")
 
 # Update styling for multiselect so it's not tiny
@@ -69,7 +71,7 @@ st.markdown("""<style>div.stButton > button:first-child {
             """, unsafe_allow_html=True)
 
 "# Data Preparation"
-default_input_file = "default.csv"
+
 input_file = st.file_uploader("Choose a file for Population Analysis. If no file is chosen, the default will be used.", type=["txt","csv"])
 
 #@st.cache(allow_output_mutation=True) # dont enable, this is a problem for now
@@ -86,8 +88,8 @@ def read_input_file():
             "Unable to load file. Did you make sure it was a CSV formatted file?"
             sys.exit()
     else:
-        raw_data = pd.read_csv(default_input_file, index_col=0)
-        return raw_data, default_input_file
+        raw_data = pd.read_csv(DEFAULT_INPUT_FILE, index_col=0)
+        return raw_data, DEFAULT_INPUT_FILE
 
 # DO NOT MODIFY DATA_REF, ONLY DE-REFERENCE TO GET OUR DATAFRAME FOR USE IN THE FUNCTION
 # OTHERWISE WE CAN'T CACHE IT FOR LATER USE ON RE-RUNS
@@ -345,146 +347,6 @@ gfcol1, gfcol2 = st.columns(2)
 
 gcol1x, gcol1y, gcol2, gcol3 = st.columns((1,1,4,2), gap="large")
 
-
-
-#@st.cache(allow_output_mutation=True)
-def get_threshold_graph():
-    #x = get_x()
-    #y = get_y()
-    accessions = data_master["EpisodeNumber"]
-    if session.scatter_enable:
-        # Scatterplot
-        hovertemplate="<b>%{customdata}</b><br>" + session.x.col + ": %{x}<br>" + session.y.col + ": %{y}<br><extra></extra>"
-        fig = go.Figure(
-            data=[
-                go.Scatter(
-                    x=session.x.data,
-                    y=session.y.data,
-                    mode="markers",
-                    customdata=accessions,
-                    hovertemplate=hovertemplate
-                )
-            ],
-            layout_height=800,
-        )
-    else:
-        # Histogram
-        # oi future self not sure how or if we can have accessions on the histogram2d points
-        hovertemplate="<b>Population: %{z}</b><br>" + session.x.col + ": %{x}<br>" + session.y.col + ": %{y}<br><extra></extra>"
-        fig = go.Figure(
-            data=[
-                go.Histogram2d(
-                    x=session.x.data,
-                    y=session.y.data,
-                    nbinsx=400,
-                    nbinsy=400,
-                    customdata=accessions,
-                    hovertemplate=hovertemplate,
-                    colorscale="Blues",
-                    colorbar=dict(tickfont=dict(size=30)),
-                )
-            ],
-            layout_height=800,
-        )
-
-    # Set these up to be changing relative to the session state values, which change as the slider changes.
-    # TODO: can make shift into x and y and make it relative to the size of the vrect and hrect if we want
-    shift = 0
-    fontsize = 30
-    fig.update_xaxes(showgrid=False, title=session.x.col, titlefont=dict(size=fontsize), tickfont=dict(size=fontsize))
-    fig.update_yaxes(showgrid=False, title=session.y.col, titlefont=dict(size=fontsize), tickfont=dict(size=fontsize))
-
-    #print(session.x.min,session.x.max)
-    #st.session_state["x_thresh"] = x_interval(2)
-    #st.session_state["y_thresh"] = y_interval(2)
-
-    # Threshold lines - we use these to draw the main quadrant thresholds
-    fig.add_vline(x=session.x.lo, annotation_text=f"{round(session.x.lo,4)}", annotation_font=dict(size=fontsize), annotation_xshift=-shift, annotation_position="left")
-    fig.add_vline(x=session.x.hi, annotation_text=f"{round(session.x.hi,4)}", annotation_font=dict(size=fontsize), annotation_xshift=shift, annotation_position="right")
-    fig.add_hline(y=session.y.lo, annotation_text=f"{round(session.y.lo,4)}", annotation_font=dict(size=fontsize), annotation_yshift=-shift, annotation_position="bottom")
-    fig.add_hline(y=session.y.hi, annotation_text=f"{round(session.y.hi,4)}", annotation_font=dict(size=fontsize), annotation_yshift=shift, annotation_position="top")
-
-    # Threshold areas (rectangles)
-    # for some reason need an extra buffer for the minimum x one.
-    fig.add_vrect(x0=session.x.min-session.x.std, x1=session.x.lo, fillcolor="blue", opacity=.2)
-    fig.add_vrect(x0=session.x.hi, x1=session.x.max, fillcolor="blue", opacity=.2)
-    fig.add_hrect(y0=session.y.min-session.y.std, y1=session.y.lo, fillcolor="red", opacity=.2)
-    fig.add_hrect(y0=session.y.hi, y1=session.y.max, fillcolor="red", opacity=.2)
-
-
-    return fig
-
-def get_threshold_tables():
-    # Get 3x3 tables for the areas in each of our sections in our threshold graph.
-
-    # Compute values for all octants for the text to go in each - # of values inside and % of values inside.
-    # We create masks for each to avoid having to repeat our calculations for the corners, where we AND them together.
-    mask_x_hi = session.x.data > session.x.hi
-    mask_x_lo = session.x.data < session.x.lo
-    mask_y_hi = session.y.data > session.y.hi
-    mask_y_lo = session.y.data < session.y.lo
-
-    # Middle one is actually the most complicated in terms of logic
-    mask_mid = np.logical_and(np.logical_and(session.x.data >= session.x.lo, session.x.data <= session.x.hi), np.logical_and(session.y.data >= session.y.lo, session.y.data <= session.y.hi))
-
-    # len
-    n = len(session.x.data) # EXPECTS X AND Y TO BE SAME LENGTH
-
-    mask_n = lambda m: np.sum(m) # compute # in masked area
-    mask_and_n = lambda m1, m2: np.sum(np.logical_and(m1,m2)) # compute # in intersecting masked area
-
-    mask_p = lambda m: round(mask_n(m)/n*100., 4) # compute % of whole in masked area
-    mask_and_p = lambda m1, m2: round(mask_and_n(m1, m2)/n*100., 4) # compute % of whole in intersecting masked area
-
-    # Given this, now we can assemble the 9 values
-    grid_ns = [
-        [mask_and_n(mask_x_lo, mask_y_hi), mask_n(mask_y_hi), mask_and_n(mask_x_hi, mask_y_hi)],
-        [mask_n(mask_x_lo), mask_n(mask_mid), mask_n(mask_x_hi)],
-        [mask_and_n(mask_x_lo, mask_y_lo), mask_n(mask_y_lo), mask_and_n(mask_x_hi, mask_y_lo)],
-    ]
-    grid_ps = [
-        [mask_and_p(mask_x_lo, mask_y_hi), mask_p(mask_y_hi), mask_and_p(mask_x_hi, mask_y_hi)],
-        [mask_p(mask_x_lo), mask_p(mask_mid), mask_p(mask_x_hi)],
-        [mask_and_p(mask_x_lo, mask_y_lo), mask_p(mask_y_lo), mask_and_p(mask_x_hi, mask_y_lo)],
-    ]
-
-    for i in range(3):
-        for j in range(3):
-            grid_ns[i][j] = " <br>" + str(grid_ns[i][j])
-            grid_ps[i][j] = " <br>" + str(grid_ps[i][j])
-
-    red = "#f9c9cc"
-    blue = "#c6c9ff"
-    purple = "#d1a1cc"
-    # transposed because plotly transposes the table
-    colors = [
-        [purple, blue, purple],
-        [red, "white", red],
-        [purple, blue, purple]
-    ]
-
-    # Plotly does this the reverse way so we transpose to match them
-    # REMEMBER TO DO THIS LAST
-    grid_ns = np.transpose(grid_ns)
-    grid_ps = np.transpose(grid_ps)
-    fig_ns = go.Figure(data=[go.Table(
-        header=None,
-        cells=dict(values=grid_ns, height=130),
-    )])
-    fig_ps = go.Figure(data=[go.Table(
-        header=None,
-        cells=dict(values=grid_ps, height=130, suffix="%"),
-    )])
-    # Remove headers via making invisible
-    fig_ns.for_each_trace(lambda t: t.update(header_fill_color='rgba(0,0,0,0)'))
-    fig_ps.for_each_trace(lambda t: t.update(header_fill_color='rgba(0,0,0,0)'))
-    fig_ns.update_traces(cells_fill_color=colors)
-    fig_ps.update_traces(cells_fill_color=colors)
-
-    fig_ns.update_layout(font_size=32, margin=dict(t=10, b=10))
-    fig_ps.update_layout(font_size=32, margin=dict(t=10, b=10))
-    return fig_ns, fig_ps
-
 #print([data[col].dtype for col in data.columns])
 numeric_cols = [col for col in data.columns if np.issubdtype(data[col].dtype, np.number)]
 with gfcol1:
@@ -496,24 +358,19 @@ with gfcol2:
     st.markdown("#")
     #st.button("GENERATE GRAPH", on_click=lambda x:x, args=(input, output))
 
-#def generate_graph(x_label,y_label):
-#x = data[inputs[0]]
-#y = data[outputs[0]]
 
 # TODO set this up so that they have to press update to update the graph?
 # If the user hasn't specified values for this, then don't show anything yet.
 
 # Update these attributes when we have columns for them
-#session.x.col = input
-#session.y.col = output
 session.x.update(session.data)
 session.y.update(session.data)
-#session.x.print()
+session.x.print()
+session.y.print()
 
 xname = session.x.col
 yname = session.y.col
 mask_n = lambda m: np.sum(m)/len(m)*100  # compute % in masked area
-#lambda perc2num()
 perc2num = lambda data, p: np.percentile(data, p)
 num2perc = lambda data, n: np.sum(data < n)/len(data)*100
 
@@ -550,6 +407,8 @@ except st.errors.StreamlitAPIException:
     if "x_lo" not in st.session_state:
         # First time running this, update the data so we get something started.
         update_data()
+    st.write(error_msg_template.format(yname))
+    print(traceback.format_exc())
     st.write(error_msg_template.format(xname))
 
 try:
@@ -585,13 +444,15 @@ try:
         #st.write('Values:', values) # and then we can add on the % etc.
 except st.errors.StreamlitAPIException:
     st.write(error_msg_template.format(yname))
+    print(traceback.format_exc())
+    st.write(traceback.format_exc())
 
 with gcol2:
     # TODO remove width stuff?
     graph_container = st.container()
     #x = data[inputs[0]]
     #y = data[outputs[0]]
-    fig = get_threshold_graph()
+    fig = get_threshold_graph(session, data_master)
     #fig.update_layout(autosize=False, height=800)
     # Set up some reasonable margins and heights so we actually get a more square-like graph
     # rather than the wide boi streamlit wants it to be
@@ -601,7 +462,7 @@ with gcol2:
 
 with gcol3:
     table_container = st.container()
-    table_ns, table_ps = get_threshold_tables()
+    table_ns, table_ps = get_threshold_tables(session)
     table_container.markdown("### Threshold Areas")
     table_container.plotly_chart(table_ns, use_container_width=True)
     table_container.markdown("### Threshold Area Percentages")
