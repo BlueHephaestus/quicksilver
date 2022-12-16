@@ -169,95 +169,91 @@ def update_data():
     range = max-min
 
     ##### MISSING DATA HANDLING #####
-    match st.session_state["missing_data_opt"]:
-        case "Exclude Rows with N/A values (default)":
-            data = data.dropna()
+    if st.session_state["missing_data_opt"] == "Exclude Rows with N/A values (default)":
+        data = data.dropna()
 
-        case "Use Linear Regression to Interpolate Missing Values":
-            data = data.interpolate()
+    elif st.session_state["missing_data_opt"] == "Use Linear Regression to Interpolate Missing Values":
+        data = data.interpolate()
 
-        case "Replace with Mean Value":
-            data = data.fillna(mean)
+    elif st.session_state["missing_data_opt"] == "Replace with Mean Value":
+        data = data.fillna(mean)
 
-        case "Replace with Median Value":
-            data = data.fillna(median)
+    elif st.session_state["missing_data_opt"] == "Replace with Median Value":
+        data = data.fillna(median)
 
     # print(data[data["C24:0"].isnull()])
     # print(data[data["C24:0"].isna()])
 
     ##### LOGARITHMIC SCALING #####
-    match st.session_state["log_opt"]:
-        case "None (default)":
-            # what did you expect?
-            pass
+    if st.session_state["log_opt"] == "None (default)":
+        # what did you expect?
+        pass
 
-        case "Log Base 10":
-            for col in data:
-                data[col] = np.log10(data[col])
+    elif st.session_state["log_opt"] == "Log Base 10":
+        for col in data:
+            data[col] = np.log10(data[col])
 
-        case "Log Base 2":
-            for col in data:
-                data[col] = np.log2(data[col])
+    elif st.session_state["log_opt"] == "Log Base 2":
+        for col in data:
+            data[col] = np.log2(data[col])
 
-        case "Log Base e (natural log)":
-            for col in data:
-                data[col] = np.log(data[col])
+    elif st.session_state["log_opt"] == "Log Base e (natural log)":
+        for col in data:
+            data[col] = np.log(data[col])
 
     ##### SCALING / NORMALIZATION #####
-    match st.session_state["scaling_opt"]:
-        case "None (default)":
-            # what did you expect?
-            pass
+    if st.session_state["scaling_opt"] == "None (default)":
+        # what did you expect?
+        pass
 
-        case "Z-Score Normalization":
-            # Convert all values to their z-scores, i.e. normal distribution representatives.
-            data = (data-mean) / std
+    elif st.session_state["scaling_opt"] == "Z-Score Normalization":
+        # Convert all values to their z-scores, i.e. normal distribution representatives.
+        data = (data-mean) / std
 
-        case "Min-Max Scaling":
-            # Ensure all are in the range 0-1, with min value being 0 and max being 1.
-            # We enforce a distribution into that range.
-            # Similar to z score but without distribution stuff
-            data = (data - min) / range
+    elif st.session_state["scaling_opt"] == "Min-Max Scaling":
+        # Ensure all are in the range 0-1, with min value being 0 and max being 1.
+        # We enforce a distribution into that range.
+        # Similar to z score but without distribution stuff
+        data = (data - min) / range
 
-        case "Multiple-of-Mean Standardization":
-            # Represent all data as multiples of the mean value.
-            # Mean value is 1, and for any value, multiplying it by the mean will obtain the original.
-            data = data / mean
+    elif st.session_state["scaling_opt"] == "Multiple-of-Mean Standardization":
+        # Represent all data as multiples of the mean value.
+        # Mean value is 1, and for any value, multiplying it by the mean will obtain the original.
+        data = data / mean
 
-        case "Multiple-of-Median Standardization":
-            # Same as above
-            data = data / median
+    elif st.session_state["scaling_opt"] == "Multiple-of-Median Standardization":
+        # Same as above
+        data = data / median
 
-        case "Multiple-of-Standard-Deviation Standardization":
-            # Same as above
-            data = data / std
+    elif st.session_state["scaling_opt"] == "Multiple-of-Standard-Deviation Standardization":
+        # Same as above
+        data = data / std
 
-        case "Percentile of Max Standardization":
-            # Convert all values to their percentile, such that for a given percentile p,
-            # p % of the values in the list are below the value of that percentile.
-            # 50% percentile would be the median of the list (sorted).
-            # We keep them in the range 0-1 rather than 0-100, however.
-            for col in data:
-                data[col] = stats.rankdata(data[col], "average")/len(data[col])
+    elif st.session_state["scaling_opt"] == "Percentile of Max Standardization":
+        # Convert all values to their percentile, such that for a given percentile p,
+        # p % of the values in the list are below the value of that percentile.
+        # 50% percentile would be the median of the list (sorted).
+        # We keep them in the range 0-1 rather than 0-100, however.
+        for col in data:
+            data[col] = stats.rankdata(data[col], "average")/len(data[col])
 
     ##### DATA TRANSFORMATIONS #####
-    match st.session_state["transformation_opt"]:
-        case "None (default)":
-            # lookin' sus
-            pass
+    if st.session_state["transformation_opt"] == "None (default)":
+        # lookin' sus
+        pass
 
-        case "Yeo-Johnson":
-            for col in data:
-                data[col] = power_transform(data[col].values.reshape(-1,1), method="yeo-johnson")
+    elif st.session_state["transformation_opt"] == "Yeo-Johnson":
+        for col in data:
+            data[col] = power_transform(data[col].values.reshape(-1,1), method="yeo-johnson")
 
-        case "Box-Cox (Only applied to columns with all positive values, otherwise columns will be skipped)":
-            # Can only be applied to positive values, if data is 0 then add epsilon to it.
-            for col in data:
-                if (data[col] >= 0).all():
-                    if (data[col] == 0).any():
-                        # Add epsilon to let power transform happen and avoid error
-                        data[col] += 1e-8
-                    data[col] = power_transform(data[col].values.reshape(-1,1), method="box-cox")
+    elif st.session_state["transformation_opt"] == "Box-Cox (Only applied to columns with all positive values, otherwise columns will be skipped)":
+        # Can only be applied to positive values, if data is 0 then add epsilon to it.
+        for col in data:
+            if (data[col] >= 0).all():
+                if (data[col] == 0).any():
+                    # Add epsilon to let power transform happen and avoid error
+                    data[col] += 1e-8
+                data[col] = power_transform(data[col].values.reshape(-1,1), method="box-cox")
 
 
     # PUT BACK NON NUMERICAL COLUMNS
