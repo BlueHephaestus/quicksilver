@@ -77,8 +77,16 @@ input_file = st.file_uploader("Choose file(s) for Population Analysis. If no fil
 
 # DO NOT MODIFY DATA_REF, ONLY DE-REFERENCE TO GET OUR DATAFRAME FOR USE IN THE FUNCTION
 # OTHERWISE WE CAN'T CACHE IT FOR LATER USE ON RE-RUNS
-data_master, data_fname = load_input_data(input_file)
+data_master, accession_col, data_fname = load_input_data(input_file)
 data = data_master.copy()
+# TODO: we might need something for when we specifically change the input data, so maybe put stuff there to make sure we reset everything when we reload a new file.
+st.session_state["data"] = data
+
+# Get identifier column data
+accessions = data[accession_col]
+
+# Check if we have "prefix" filtering, this is a Utah-specific feature.
+accession_filtering = accession_col == "EpisodeNumber"
 
 if len(st.session_state.keys()) < 4:
 #if "data" not in st.session_state:
@@ -113,18 +121,21 @@ def update_data():
     # can't do a negative mask because there are prefixes which are not in our list.
     #
     # Get samples with correct prefix
-    masks = [data_master["EpisodeNumber"].str.startswith(prefix) for prefix in sess("row_filter_opts")]
-    # Combine all of them with logical OR into one
-    if len(masks) != 0:
-        mask = masks[0]
-        if len(masks) > 1:
-            for m in masks[1:]:
-                mask = mask | m
-        data = data_master[mask]
+    if accession_filtering:
+        masks = [data_master[accession_col].str.startswith(prefix) for prefix in sess("row_filter_opts")]
+        # Combine all of them with logical OR into one
+        if len(masks) != 0:
+            mask = masks[0]
+            if len(masks) > 1:
+                for m in masks[1:]:
+                    mask = mask | m
+            data = data_master[mask]
+        else:
+            # Empty dataframe
+            data = data_master[0:0]
+            return
     else:
-        # Empty dataframe
-        data = data_master[0:0]
-        return
+        data = data_master.copy()
 
     ##### COLUMN FILTERING #####
     # Don't remove columns until the very end, so we can still do our row filtering based on column values
@@ -277,10 +288,12 @@ with col1:
     st.session_state["col_filter_opts"] = container.multiselect("Choose which Column Headers to Keep:", headers, headers)
 
     # Let them choose the types of samples to use, via the prefixes on
-    # the "EpisodeNumber" column. F is only one checked by default,
+    # the accession_col column. F is only one checked by default,
     # however we may also have AAC and S. These are the supported options
-    prefixes = ["F", "AAC", "S", "R"]
-    st.session_state["row_filter_opts"] = st.multiselect("Choose which Sample Types to use for this Analysis (by prefix):", prefixes, ["F"])
+
+    if accession_filtering:
+        prefixes = ["F", "AAC", "S", "R"]
+        st.session_state["row_filter_opts"] = st.multiselect("Choose which Sample Types to use for this Analysis (by prefix):", prefixes, ["F"])
 
 with col2:
     st.session_state["missing_data_opt"] = st.selectbox(

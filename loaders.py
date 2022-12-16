@@ -39,7 +39,7 @@ def load_input_data(input_files):
         # No file given, use default
         raw_data = pd.read_csv(DEFAULT_INPUT_FILE, index_col=0)
         st.write("Using default file, since no file provided yet.")
-        return raw_data, DEFAULT_INPUT_FILE
+        return raw_data, raw_data.columns[0], DEFAULT_INPUT_FILE
 
     if len(input_files) == 1:
         # One file given, load it.
@@ -47,8 +47,14 @@ def load_input_data(input_files):
         input_file = input_files[0]
         if os.path.splitext(input_file.name)[-1] in [".xls", ".xlsx"]:
             df = pd.read_excel(input_file)
-        else: #txt or csv
-            df = pd.read_csv(input_file)
+        else: #txt or csv or tsv
+            # check if tsv or csv via how many columns we get using either, the one with more is assumed correct
+            tab = pd.read_csv(input_file, nrows=1, sep='\t').shape[1]
+            com = pd.read_csv(input_file, nrows=1, sep=',').shape[1]
+            if tab > com:
+                df = pd.read_csv(input_file, sep='\t')
+            else:
+                df = pd.read_csv(input_file, sep=',')#default
 
         # metadata for determining
         cols = [col.lower() for col in df.columns]
@@ -57,6 +63,48 @@ def load_input_data(input_files):
         # If it has analytename as a column then we assume that's a charlie
         if "AnalyteName" in cols:
             # CHARLIE
+            """
+            Keep only necessary columns:
+            AnalyteName: distinguishing analytes
+            PlateID: distinguishing plates
+            Specimen: determining if control or first or second
+            value: value
+
+            And combine all plates into one dataframe for us to use.
+            """
+            ##### START COPY PASTA
+            dfs = []
+            dfs.append(pd.read_csv(fname, sep='\t', usecols=["AnalyteName", "PlateID", "Specimen", "Value"]))
+            # Combine all subsequent dfs into first one, via concatenation. to make a big df
+            # df = dfs[0]
+            # for concat_df in dfs[1:]:
+            #     df = pd.concat(df, concat_df)
+            df = pd.concat(dfs, ignore_index=True)
+
+            # Cols = Analyte, Plate, Specimen, Value
+            ANALYTE = 0
+            PLATE = 1
+            SPECIMEN = 2
+            VALUE = 3
+
+            # Iterate through each analyte - first loop
+            # Get mean and stddev for all non-control samples across all plates with this analyte
+            analytes = np.unique(data[:, ANALYTE])
+            plates = np.unique(data[:, PLATE])
+
+            control_sample = lambda row: row[SPECIMEN].startswith("AAAC")
+
+            # each entry has analyte_name: plate: values for each non-control sample with this analyte
+            analyte_plate_pop = {analyte: {} for analyte in analytes}
+            for analyte in analytes:
+                for plate in plates:
+                    analyte_plate_pop[analyte][plate] = []
+
+            # Populate dictionary of analyte values.
+            for row in data:
+                if not control_sample(row):
+                    analyte_plate_pop[row[ANALYTE]][row[PLATE]].append(row[VALUE])
+            ##### END COPY PASTA
             pass
             return
 
@@ -94,12 +142,12 @@ def load_input_data(input_files):
             # Data is now same as usual, we re-pandas it and return
             df = pd.DataFrame(data[1:], columns=data[0])
 
-            return df, input_file
+            return df, df.columns[0], input_file
 
         # ALPHA
         # It's now an alpha, which means it's normal and ez, return as usual.
         # Note: Streamlit doesn't let you rename the index easily, it shows in other apps but not streamlit.
-        return df, input_file
+        return df, df.columns[0], input_file
 
 
 
