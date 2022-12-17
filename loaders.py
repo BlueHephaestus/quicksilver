@@ -159,11 +159,8 @@ def pandas_read_flexible(input_file):
             except pandas.errors.EmptyDataError:
                 com = 0
 
-            print(tab,com)
             if tab > com:
                 return df_tab
-                #print(len(pd.read_csv(input_file, sep='\t')))
-                #print(input_file, df)
             else:
                 return df_com
     except:
@@ -271,8 +268,8 @@ def load_bravo_data(df, total_nan_rows_head, total_nan_rows_tail):
             # Cut off the tail and stop iter
             data = data[:-i - 1]
             break
-    # Data is now same as usual, we re-pandas it and return
-    df = pd.DataFrame(data[1:], columns=data[0])
+    # Data is now same as usual, we re-pandas it, infer datatypes, and return
+    df = pd.DataFrame(data[1:], columns=data[0]).infer_objects()
     return df
 
 # TESTCASES, YOU WILL NEED TO REMOVE THE ".NAME" BIT FROM READ_FLEXIBLE IF YOU WANT TO USE THESE.
@@ -289,10 +286,10 @@ def load_bravo_data(df, total_nan_rows_head, total_nan_rows_tail):
 # load_input_data([f1,f2])
 
 
-# Multiple / one beta
-#f1 = "data/Texas_Dataset_Example/mer30608N01084_Conc1.xlsx"
-#f2 = "data/Texas_Dataset_Example/gim30815N01469_Conc1.xlsx"
-#load_input_data([f1, f2])
+# Multiple / one bravos
+# f1 = "data/Texas_Dataset_Example/mer30608N01084_Conc1.xlsx"
+# f2 = "data/Texas_Dataset_Example/gim30815N01469_Conc1.xlsx"
+# load_input_data([f1, f2])
 
 # Single alpha
 #f1 = "data/NewYork_Dataset_Example/For APHL QI Machine_edited.xlsx"

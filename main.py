@@ -140,6 +140,7 @@ def update_data():
 
     ##### COLUMN FILTERING #####
     # Don't remove columns until the very end, so we can still do our row filtering based on column values
+    print(st.session_state)
     data = data[sess("col_filter_opts")]
 
     ####### TRANSFORMATIONS ########
@@ -152,6 +153,8 @@ def update_data():
     cols = data.columns.tolist()
     cols_non_numerical = data.select_dtypes(exclude=[np.number]).columns.values
     cols_numerical = data.select_dtypes(include=[np.number]).columns.values
+    print(data.select_dtypes(exclude=[np.number]).columns)
+    print(data.select_dtypes(include=[np.number]).columns)
 
     data_non_numerical = data[cols_non_numerical]
     data = data[cols_numerical]
