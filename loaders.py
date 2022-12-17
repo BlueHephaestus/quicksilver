@@ -1,3 +1,6 @@
+import traceback
+
+import pandas.errors
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -61,6 +64,7 @@ def load_input_data(input_files):
         head, tail = df.head(10), df.tail(10)
 
         # If it has analytename as a column then we assume that's a charlie
+        print(df)
         if "analytename" in cols:
             # CHARLIE
             df = load_charlie_data(df)
@@ -75,7 +79,9 @@ def load_input_data(input_files):
             return df, df.columns[0], input_file, "bravo"
 
         # ALPHA
-        # It's now an alpha, which means it's normal and ez, return as usual.
+        # It's now an alpha, which means it's normal, but may have some noise rows of stats or empty rows.
+        # We identify these by if they have the second and third columns empty
+        df = df[~(pd.isnull(df[df.columns[1]]) & pd.isnull(df[df.columns[2]]))]
         # Note: Streamlit doesn't let you rename the index easily, it shows in other apps but not streamlit.
         return df, df.columns[0], input_file, "alpha"
 
@@ -94,17 +100,17 @@ def load_input_data(input_files):
 
             # Index column deserves specific error case, I suppose.
             if accession_col_new != accession_col:
-                st.write(f"File {data_fname_new} has a different identifier column / accession number than the one in {data_fname}. Reconcile these differences to load both files together.")
+                st.write(f"File '*{data_fname_new.name}*' has a different identifier column / accession number than the one in '*{data_fname.name}*'. ('{accession_col_new}' vs. '{accession_col}') Reconcile these differences to load both files together.")
                 sys.exit()
 
             # Overall format compare
             if data_type_new != data_type:
-                st.write(f"File {data_fname_new} has a different format than the one in {data_fnames}. Reconcile these differences to load both files together.")
+                st.write(f"File '*{data_fname_new.name}*' has a different format than the one in '*{data_fnames.name}*'. Reconcile these differences to load both files together.")
                 sys.exit()
 
             # Finally check to make sure the columns sets are the same.
             if len(columns.union(columns_new)) > len(columns):
-                st.write(f"File {data_fname_new} has extra and/or different columns than those in {data_fname}. Reconcile these differences to load both files together.")
+                st.write(f"File '*{data_fname_new.name}*' has extra and/or different columns than those in '*{data_fname.name}*'. Reconcile these differences to load both files together.")
                 sys.exit()
 
             # This is a compatible dataframe, add it and continue.
@@ -118,30 +124,52 @@ def load_input_data(input_files):
         # that created this dataframe.
         return df, accession_col, data_fnames, data_type
 
-        try:
-            pass
-        except:
-            "Unable to load file. Did you make sure it was a CSV formatted file?"
-            sys.exit()
-
 def pandas_read_flexible(input_file):
     """
     Load from input file, without knowing if it's a CSV, Excel doc, or TSV.
         Attempts to infer the filetype and read accordingly.
     :param input_file: Input file of uncertain filetype
     :return: Dataframe from loading input file.
+
+
+    IMPORTANT NOTE
+
+    I couldn't find any stackoverflow or bug reports seconding this, but i found when I loaded a file with read_csv,
+    evne if the first load was only with nrows=1, the second load would subsequently only occur way later in the file.
+
+    This might have to do with pandas loading and iterating through the buffer a certain point (it was about 5688 rows)
+    even when loaded into one row, combined with the streamlit loading these files into memory, idk.
+
+    But we can only reallly load them once, so that's what we're doing now.
     """
-    #### TEMPORARILY REMOVED .NAME
-    if os.path.splitext(input_file)[-1] in [".xls", ".xlsx"]:
-        df = pd.read_excel(input_file)
-    else:  # txt or csv or tsv
-        # check if tsv or csv via how many columns we get using either, the one with more is assumed correct
-        tab = pd.read_csv(input_file, nrows=1, sep='\t').shape[1]
-        com = pd.read_csv(input_file, nrows=1, sep=',').shape[1]
-        if tab > com:
-            df = pd.read_csv(input_file, sep='\t')
-        else:
-            df = pd.read_csv(input_file, sep=',')  # default
+    try:
+        if os.path.splitext(input_file.name)[-1] in [".xls", ".xlsx"]:
+            df = pd.read_excel(input_file, engine='openpyxl')
+        else:  # txt or csv or tsv
+            # check if tsv or csv via how many columns we get using either, the one with more is assumed correct
+            try:
+                df_tab = pd.read_csv(input_file, sep='\t')
+                tab = df_tab.shape[1]
+            except pandas.errors.EmptyDataError:
+                tab = 0
+
+            try:
+                df_com = pd.read_csv(input_file, sep='\t')
+                com = df_com.shape[1]
+            except pandas.errors.EmptyDataError:
+                com = 0
+
+            print(tab,com)
+            if tab > com:
+                return df_tab
+                #print(len(pd.read_csv(input_file, sep='\t')))
+                #print(input_file, df)
+            else:
+                return df_com
+    except:
+        st.write(f"Error encountered on loading file '*{input_file.name}*':")
+        st.markdown("```" + traceback.format_exc() + "```")
+        sys.exit()
     return df
 
 def load_charlie_data(df):
@@ -247,9 +275,33 @@ def load_bravo_data(df, total_nan_rows_head, total_nan_rows_tail):
     df = pd.DataFrame(data[1:], columns=data[0])
     return df
 
+# TESTCASES, YOU WILL NEED TO REMOVE THE ".NAME" BIT FROM READ_FLEXIBLE IF YOU WANT TO USE THESE.
+# Multiple charlies
+# f1 = "data/Utah_Dataset_Example/ZZPlateResultAAAC03202100069-1328139.txt"
+# f2 = "data/Utah_Dataset_Example/ZZPlateResultAAAC03202100077-1328157.txt"
+# f3 = "data/Utah_Dataset_Example/ZZPlateResultAAAC03202100079-1328179.txt"
+# f4 = "data/Utah_Dataset_Example/ZZPlateResultAAAC07202100091-1328083.txt"
+# load_input_data([f1, f2, f3, f4])
 
-f1 = "data/Utah_Dataset_Example/ZZPlateResultAAAC03202100069-1328139.txt"
-load_input_data([f1])
+# Problem case with charlies
+# f1 = "data/Utah_Dataset_Example/ZZPlateResultAAAC07202100085-1327806.txt"
+# f2 = "data/Utah_Dataset_Example/ZZPlateResultAAAC07202100086-1327807.txt"
+# load_input_data([f1,f2])
+
+
+# Multiple / one beta
+#f1 = "data/Texas_Dataset_Example/mer30608N01084_Conc1.xlsx"
+#f2 = "data/Texas_Dataset_Example/gim30815N01469_Conc1.xlsx"
+#load_input_data([f1, f2])
+
+# Single alpha
+#f1 = "data/NewYork_Dataset_Example/For APHL QI Machine_edited.xlsx"
+#load_input_data([f1])
+
+# conflicting alphas. should error.
+#f1 = "data/NewYork_Dataset_Example/For APHL QI Machine_edited.xlsx"
+#f2 = "/home/blue/Projects/quicksilver/data/default.csv"
+#load_input_data([f1,f2])
 
 
 
