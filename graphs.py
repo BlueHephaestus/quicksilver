@@ -4,7 +4,8 @@ import plotly.graph_objects as go
 def get_threshold_graph(session, data_master):
     #x = get_x()
     #y = get_y()
-    accessions = data_master["EpisodeNumber"]
+    #accessions = data_master["EpisodeNumber"]
+    accessions = data_master[session.accession_col]
     if session.scatter_enable:
         # Scatterplot
         hovertemplate="<b>%{customdata}</b><br>" + session.x.col + ": %{x}<br>" + session.y.col + ": %{y}<br><extra></extra>"

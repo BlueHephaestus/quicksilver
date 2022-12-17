@@ -17,7 +17,7 @@ class Variable:
 
         # Can only be computed once the col attribute is given for both, since we compute it from the
         # data[col] data.
-
+        print(self.col)
         self.data = data[self.col]
         # TODO we need a case here for if data is non-numeric, what to do?
         self.mean = float(np.mean(self.data))
@@ -44,7 +44,7 @@ class Variable:
 
 
 class Session:
-    def __init__(self, data):
+    def __init__(self, data_master, accession_col):
         """
         Class for managing session variables and functions throughout usage of quicksilver,
             including the dataset they filter through and the operations chosen.
@@ -57,7 +57,17 @@ class Session:
 
         """
         # Init all session variables
-        self.data = data
+        self.data_master = data_master
+        self.data = data_master.copy()
+        self.accession_col = accession_col
+
+        self.row_filter_opts = []
+        self.col_filter_opts = []
+
+        self.missing_data_opt = []
+        self.log_opt = []
+        self.scaling_opt = []
+        self.transformation_opt = []
 
         self.x = Variable()
         self.y = Variable()

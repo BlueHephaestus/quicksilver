@@ -79,30 +79,42 @@ input_file = st.file_uploader("Choose file(s) for Population Analysis. If no fil
 # OTHERWISE WE CAN'T CACHE IT FOR LATER USE ON RE-RUNS
 print(input_file)
 data_master, accession_col, data_fname, data_type = load_input_data(input_file)
+
+@st.cache(allow_output_mutation=True)
+def load_session(data_master, accession_col):
+    print("RE INIT OF SESSION")
+    return Session(data_master, accession_col)
+
+session = load_session(data_master, accession_col)
+
+print("INPUT FILE CHANGED: ", accession_col)
 data = data_master.copy()
 # TODO: we might need something for when we specifically change the input data, so maybe put stuff there to make sure we reset everything when we reload a new file.
-st.session_state["data"] = data
+#st.session_state["data"] = data
+#st.session_state["accession_col"] = accession_col
 
 # Get identifier column data
-accessions = data[accession_col]
+accessions = session.data_master[accession_col]
 
 # Check if we have "prefix" filtering, this is a Utah-specific feature.
 accession_filtering = accession_col == "EpisodeNumber"
 
-if len(st.session_state.keys()) < 4:
-#if "data" not in st.session_state:
-    print("Resetting session")
-    st.session_state = {
-        "data": data,
-        "row_filter_opts": [],
-        "col_filter_opts": [],
-        "update": False,
-    }
+# if len(st.session_state.keys()) < 5:
+# #if "data" not in st.session_state:
+#     print("Resetting session")
+#     st.session_state = {
+#         "data": data,
+#         "row_filter_opts": [],
+#         "col_filter_opts": [],
+#         "accession_col": accession_col,
+#         "update": False,
+#     }
 
-sess = lambda s: st.session_state[s]
+#sess = lambda s: st.session_state[s]
 f"#### Current Data: "
+print("Writing current data to container")
 data_container = st.empty()
-data_container.container().write(st.session_state["data"])
+data_container.container().write(session.data)
 
 ##### DATA PREPARATION AND MODIFICATION TIME #####
 def update_data():
@@ -113,6 +125,7 @@ def update_data():
     :return:
     """
     print("Updating Data...")
+    #print(st.session_state)
 
     ####### FILTERING #######
     ##### ROW FILTERING #####
@@ -123,7 +136,7 @@ def update_data():
     #
     # Get samples with correct prefix
     if accession_filtering:
-        masks = [data_master[accession_col].str.startswith(prefix) for prefix in sess("row_filter_opts")]
+        masks = [data_master[session.accession_col].str.startswith(prefix) for prefix in session.row_filter_opts]
         # Combine all of them with logical OR into one
         if len(masks) != 0:
             mask = masks[0]
@@ -140,8 +153,7 @@ def update_data():
 
     ##### COLUMN FILTERING #####
     # Don't remove columns until the very end, so we can still do our row filtering based on column values
-    print(st.session_state)
-    data = data[sess("col_filter_opts")]
+    data = data[session.col_filter_opts]
 
     ####### TRANSFORMATIONS ########
     # Now that all data is filtered, we operate on what's left with various data transformations
@@ -153,8 +165,6 @@ def update_data():
     cols = data.columns.tolist()
     cols_non_numerical = data.select_dtypes(exclude=[np.number]).columns.values
     cols_numerical = data.select_dtypes(include=[np.number]).columns.values
-    print(data.select_dtypes(exclude=[np.number]).columns)
-    print(data.select_dtypes(include=[np.number]).columns)
 
     data_non_numerical = data[cols_non_numerical]
     data = data[cols_numerical]
@@ -169,67 +179,67 @@ def update_data():
     range = max-min
 
     ##### MISSING DATA HANDLING #####
-    if st.session_state["missing_data_opt"] == "Exclude Rows with N/A values (default)":
+    if session.missing_data_opt == "Exclude Rows with N/A values (default)":
         data = data.dropna()
 
-    elif st.session_state["missing_data_opt"] == "Use Linear Regression to Interpolate Missing Values":
+    elif session.missing_data_opt == "Use Linear Regression to Interpolate Missing Values":
         data = data.interpolate()
 
-    elif st.session_state["missing_data_opt"] == "Replace with Mean Value":
+    elif session.missing_data_opt == "Replace with Mean Value":
         data = data.fillna(mean)
 
-    elif st.session_state["missing_data_opt"] == "Replace with Median Value":
+    elif session.missing_data_opt == "Replace with Median Value":
         data = data.fillna(median)
 
     # print(data[data["C24:0"].isnull()])
     # print(data[data["C24:0"].isna()])
 
     ##### LOGARITHMIC SCALING #####
-    if st.session_state["log_opt"] == "None (default)":
+    if session.log_opt == "None (default)":
         # what did you expect?
         pass
 
-    elif st.session_state["log_opt"] == "Log Base 10":
+    elif session.log_opt == "Log Base 10":
         for col in data:
             data[col] = np.log10(data[col])
 
-    elif st.session_state["log_opt"] == "Log Base 2":
+    elif session.log_opt == "Log Base 2":
         for col in data:
             data[col] = np.log2(data[col])
 
-    elif st.session_state["log_opt"] == "Log Base e (natural log)":
+    elif session.log_opt == "Log Base e (natural log)":
         for col in data:
             data[col] = np.log(data[col])
 
     ##### SCALING / NORMALIZATION #####
-    if st.session_state["scaling_opt"] == "None (default)":
+    if session.scaling_opt == "None (default)":
         # what did you expect?
         pass
 
-    elif st.session_state["scaling_opt"] == "Z-Score Normalization":
+    elif session.scaling_opt == "Z-Score Normalization":
         # Convert all values to their z-scores, i.e. normal distribution representatives.
         data = (data-mean) / std
 
-    elif st.session_state["scaling_opt"] == "Min-Max Scaling":
+    elif session.scaling_opt == "Min-Max Scaling":
         # Ensure all are in the range 0-1, with min value being 0 and max being 1.
         # We enforce a distribution into that range.
         # Similar to z score but without distribution stuff
         data = (data - min) / range
 
-    elif st.session_state["scaling_opt"] == "Multiple-of-Mean Standardization":
+    elif session.scaling_opt == "Multiple-of-Mean Standardization":
         # Represent all data as multiples of the mean value.
         # Mean value is 1, and for any value, multiplying it by the mean will obtain the original.
         data = data / mean
 
-    elif st.session_state["scaling_opt"] == "Multiple-of-Median Standardization":
+    elif session.scaling_opt == "Multiple-of-Median Standardization":
         # Same as above
         data = data / median
 
-    elif st.session_state["scaling_opt"] == "Multiple-of-Standard-Deviation Standardization":
+    elif session.scaling_opt == "Multiple-of-Standard-Deviation Standardization":
         # Same as above
         data = data / std
 
-    elif st.session_state["scaling_opt"] == "Percentile of Max Standardization":
+    elif session.scaling_opt == "Percentile of Max Standardization":
         # Convert all values to their percentile, such that for a given percentile p,
         # p % of the values in the list are below the value of that percentile.
         # 50% percentile would be the median of the list (sorted).
@@ -238,15 +248,15 @@ def update_data():
             data[col] = stats.rankdata(data[col], "average")/len(data[col])
 
     ##### DATA TRANSFORMATIONS #####
-    if st.session_state["transformation_opt"] == "None (default)":
+    if session.transformation_opt == "None (default)":
         # lookin' sus
         pass
 
-    elif st.session_state["transformation_opt"] == "Yeo-Johnson":
+    elif session.transformation_opt == "Yeo-Johnson":
         for col in data:
             data[col] = power_transform(data[col].values.reshape(-1,1), method="yeo-johnson")
 
-    elif st.session_state["transformation_opt"] == "Box-Cox (Only applied to columns with all positive values, otherwise columns will be skipped)":
+    elif session.transformation_opt == "Box-Cox (Only applied to columns with all positive values, otherwise columns will be skipped)":
         # Can only be applied to positive values, if data is 0 then add epsilon to it.
         for col in data:
             if (data[col] >= 0).all():
@@ -264,9 +274,12 @@ def update_data():
 
     # Update displayed dataframe, always do this last
     # TODO: Do we need to store data in the session state if we are doing container write?
-    st.session_state["data"] = data
+    #session.data"] = data
+    print("UPDATING DATA")
+    session.data = data
+    print(session.data.columns)
     data_container.empty()
-    data_container.write(st.session_state["data"])
+    data_container.write(session.data)
 
 #with st.form("data_prep"):
 col1,col2 = st.columns(2)
@@ -277,7 +290,7 @@ with col1:
     no_ratios = st.checkbox("Exclude Ratio (A/B) Columns")
     no_nans = st.checkbox("Exclude Columns with N/A Values")
     numerical_only = st.checkbox("Only Include Columns with Numerical Values")
-
+    print("UPDATING FORM DATA")
     headers = [str(col) for col in data.columns]
     if no_ratios:
         # remove all ratio headers currently selected
@@ -289,7 +302,7 @@ with col1:
     if numerical_only:
         headers = [h for h in headers if np.issubdtype(data[h].dtype, np.number)]
 
-    st.session_state["col_filter_opts"] = container.multiselect("Choose which Column Headers to Keep:", headers, headers)
+    session.col_filter_opts = container.multiselect("Choose which Column Headers to Keep:", headers, headers)
 
     # Let them choose the types of samples to use, via the prefixes on
     # the accession_col column. F is only one checked by default,
@@ -297,24 +310,24 @@ with col1:
 
     if accession_filtering:
         prefixes = ["F", "AAC", "S", "R"]
-        st.session_state["row_filter_opts"] = st.multiselect("Choose which Sample Types to use for this Analysis (by prefix):", prefixes, ["F"])
+        session.row_filter_opts = st.multiselect("Choose which Sample Types to use for this Analysis (by prefix):", prefixes, ["F"])
 
 with col2:
-    st.session_state["missing_data_opt"] = st.selectbox(
+    session.missing_data_opt = st.selectbox(
         "Missing Data Handling",
         ("Exclude Rows with N/A values (default)",
          "Use Linear Regression to Interpolate Missing Values",
          "Replace with Mean Value",
          "Replace with Median Value",
          ))
-    st.session_state["log_opt"] = st.selectbox(
+    session.log_opt = st.selectbox(
         "Logarithmic Scaling Method",
         ("None (default)",
          "Log Base 10",
          "Log Base 2",
          "Log Base e (natural log)",
          ))
-    st.session_state["scaling_opt"] = st.selectbox(
+    session.scaling_opt = st.selectbox(
         "Scaling / Normalization Method",
         ("None (default)",
          "Z-Score Normalization",
@@ -324,7 +337,7 @@ with col2:
          "Multiple-of-Standard-Deviation Standardization",
          "Percentile of Max Standardization",
          ))
-    st.session_state["transformation_opt"] = st.selectbox(
+    session.transformation_opt = st.selectbox(
         "Data Transformations (Make sure your data is in the correct ranges for your chosen transform)",
         ("None (default)",
          "Yeo-Johnson",
@@ -338,19 +351,22 @@ with col2:
 "# Data Visualization & Analysis"
 "Using the above dataframe, you can now visualize and analyse the resulting data however you like."
 
-data = st.session_state["data"]
-session = Session(data)
+#data = st.session_state["data"]
+#accession_col = st.session_state["accession_col"]
+#session = Session(data, accession_col)
+#print(st.session_state)
 
 gfcol1, gfcol2 = st.columns(2)
 
 gcol1x, gcol1y, gcol2, gcol3 = st.columns((1,1,4,2), gap="large")
 
 #print([data[col].dtype for col in data.columns])
-numeric_cols = [col for col in data.columns if np.issubdtype(data[col].dtype, np.number)]
+numeric_cols = [col for col in session.data.columns if np.issubdtype(session.data[col].dtype, np.number)]
+print("COLUMNS", session.data.columns)
 with gfcol1:
     # Only allow choice of numeric columns, for now.
     session.x.col = st.selectbox("Input / Independent Variables: ", numeric_cols)
-    session.y.col = st.selectbox("Output / Dependent Variables: ", [col for col in numeric_cols if col != session.x.col])
+    session.y.col = st.selectbox("Output / Dependent Variables: ", numeric_cols)
     session.scatter_enable = st.checkbox("Render graph as scatterplot instead of histogram (this will lower performance)")
 with gfcol2:
     st.markdown("#")
@@ -363,8 +379,8 @@ with gfcol2:
 # Update these attributes when we have columns for them
 session.x.update(session.data)
 session.y.update(session.data)
-session.x.print()
-session.y.print()
+#session.x.print()
+#session.y.print()
 
 xname = session.x.col
 yname = session.y.col

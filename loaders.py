@@ -34,7 +34,7 @@ def nan_rows_count(df):
     return len(df[df.isna().all(axis=1)])
 
 
-#@st.cache()
+@st.cache()
 def load_input_data(input_files):
     """
 
@@ -46,7 +46,6 @@ def load_input_data(input_files):
         data_type: the identifier we use for the type of file it was. 'alpha','bravo',...etc.
     """
     print("Reading input file from disk...")
-    print(input_files)
     if len(input_files) == 0:
         # No file given, use default
         raw_data = pd.read_csv(DEFAULT_INPUT_FILE, index_col=0)
@@ -64,7 +63,6 @@ def load_input_data(input_files):
         head, tail = df.head(10), df.tail(10)
 
         # If it has analytename as a column then we assume that's a charlie
-        print(df)
         if "analytename" in cols:
             # CHARLIE
             df = load_charlie_data(df)
@@ -228,7 +226,7 @@ def load_charlie_data(df):
         data[i, 1] = row[PLATE]
         data[i, j] = row[VALUE]
 
-    df_new = pd.DataFrame(data, columns=cols_new)
+    df_new = pd.DataFrame(data, columns=cols_new).infer_objects()
 
 
     # analyte_plate_pop = {analyte: {} for analyte in analytes}
