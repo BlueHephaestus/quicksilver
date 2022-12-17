@@ -77,7 +77,8 @@ input_file = st.file_uploader("Choose file(s) for Population Analysis. If no fil
 
 # DO NOT MODIFY DATA_REF, ONLY DE-REFERENCE TO GET OUR DATAFRAME FOR USE IN THE FUNCTION
 # OTHERWISE WE CAN'T CACHE IT FOR LATER USE ON RE-RUNS
-data_master, accession_col, data_fname = load_input_data(input_file)
+print(input_file)
+data_master, accession_col, data_fname, data_type = load_input_data(input_file)
 data = data_master.copy()
 # TODO: we might need something for when we specifically change the input data, so maybe put stuff there to make sure we reset everything when we reload a new file.
 st.session_state["data"] = data
