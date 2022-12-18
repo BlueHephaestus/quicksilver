@@ -17,7 +17,6 @@ class Variable:
 
         # Can only be computed once the col attribute is given for both, since we compute it from the
         # data[col] data.
-        print(self.col)
         self.data = data[self.col]
         # TODO we need a case here for if data is non-numeric, what to do?
         self.mean = float(np.mean(self.data))

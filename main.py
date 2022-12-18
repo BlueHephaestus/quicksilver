@@ -77,7 +77,6 @@ input_file = st.file_uploader("Choose file(s) for Population Analysis. If no fil
 
 # DO NOT MODIFY DATA_REF, ONLY DE-REFERENCE TO GET OUR DATAFRAME FOR USE IN THE FUNCTION
 # OTHERWISE WE CAN'T CACHE IT FOR LATER USE ON RE-RUNS
-print(input_file)
 data_master, accession_col, data_fname, data_type = load_input_data(input_file)
 
 @st.cache(allow_output_mutation=True)
@@ -90,8 +89,6 @@ session = load_session(data_master, accession_col)
 print("INPUT FILE CHANGED: ", accession_col)
 data = data_master.copy()
 # TODO: we might need something for when we specifically change the input data, so maybe put stuff there to make sure we reset everything when we reload a new file.
-#st.session_state["data"] = data
-#st.session_state["accession_col"] = accession_col
 
 # Get identifier column data
 accessions = session.data_master[accession_col]
@@ -99,18 +96,6 @@ accessions = session.data_master[accession_col]
 # Check if we have "prefix" filtering, this is a Utah-specific feature.
 accession_filtering = accession_col == "EpisodeNumber"
 
-# if len(st.session_state.keys()) < 5:
-# #if "data" not in st.session_state:
-#     print("Resetting session")
-#     st.session_state = {
-#         "data": data,
-#         "row_filter_opts": [],
-#         "col_filter_opts": [],
-#         "accession_col": accession_col,
-#         "update": False,
-#     }
-
-#sess = lambda s: st.session_state[s]
 f"#### Current Data: "
 print("Writing current data to container")
 data_container = st.empty()
@@ -125,7 +110,6 @@ def update_data():
     :return:
     """
     print("Updating Data...")
-    #print(st.session_state)
 
     ####### FILTERING #######
     ##### ROW FILTERING #####
@@ -160,7 +144,6 @@ def update_data():
 
     ### GET STATISTICS FOR NUMERICAL COLUMNS ###
     # Remove all non-numerical so we can operate on the numbers and put them back later
-    #print(data.isnull().any())
     # Additionally get the columns so we can retain their order
     cols = data.columns.tolist()
     cols_non_numerical = data.select_dtypes(exclude=[np.number]).columns.values
@@ -190,9 +173,6 @@ def update_data():
 
     elif session.missing_data_opt == "Replace with Median Value":
         data = data.fillna(median)
-
-    # print(data[data["C24:0"].isnull()])
-    # print(data[data["C24:0"].isna()])
 
     ##### LOGARITHMIC SCALING #####
     if session.log_opt == "None (default)":
@@ -274,14 +254,10 @@ def update_data():
 
     # Update displayed dataframe, always do this last
     # TODO: Do we need to store data in the session state if we are doing container write?
-    #session.data"] = data
-    print("UPDATING DATA")
     session.data = data
-    print(session.data.columns)
     data_container.empty()
     data_container.write(session.data)
 
-#with st.form("data_prep"):
 col1,col2 = st.columns(2)
 with col1:
     ##### HEADERS #####
@@ -351,11 +327,6 @@ with col2:
 "# Data Visualization & Analysis"
 "Using the above dataframe, you can now visualize and analyse the resulting data however you like."
 
-#data = st.session_state["data"]
-#accession_col = st.session_state["accession_col"]
-#session = Session(data, accession_col)
-#print(st.session_state)
-
 gfcol1, gfcol2 = st.columns(2)
 
 gcol1x, gcol1y, gcol2, gcol3 = st.columns((1,1,4,2), gap="large")
@@ -365,8 +336,8 @@ numeric_cols = [col for col in session.data.columns if np.issubdtype(session.dat
 print("COLUMNS", session.data.columns)
 with gfcol1:
     # Only allow choice of numeric columns, for now.
-    session.x.col = st.selectbox("Input / Independent Variables: ", numeric_cols)
-    session.y.col = st.selectbox("Output / Dependent Variables: ", numeric_cols)
+    session.x.col = st.selectbox("Input / Independent Variables: ", numeric_cols, index=0)
+    session.y.col = st.selectbox("Output / Dependent Variables: ", numeric_cols, index=1)
     session.scatter_enable = st.checkbox("Render graph as scatterplot instead of histogram (this will lower performance)")
 with gfcol2:
     st.markdown("#")
@@ -379,9 +350,7 @@ with gfcol2:
 # Update these attributes when we have columns for them
 session.x.update(session.data)
 session.y.update(session.data)
-#session.x.print()
-#session.y.print()
-
+print(1)
 xname = session.x.col
 yname = session.y.col
 mask_n = lambda m: np.sum(m)/len(m)*100  # compute % in masked area
@@ -425,6 +394,7 @@ except st.errors.StreamlitAPIException:
     print(traceback.format_exc())
     st.write(error_msg_template.format(xname))
 
+print(2)
 try:
     with gcol1y:
         # Spacer
@@ -461,18 +431,17 @@ except st.errors.StreamlitAPIException:
     print(traceback.format_exc())
     st.write(traceback.format_exc())
 
+print(3)
 with gcol2:
     # TODO remove width stuff?
     graph_container = st.container()
-    #x = data[inputs[0]]
-    #y = data[outputs[0]]
     fig = get_threshold_graph(session, data_master)
-    #fig.update_layout(autosize=False, height=800)
     # Set up some reasonable margins and heights so we actually get a more square-like graph
     # rather than the wide boi streamlit wants it to be
     fig.layout.height=1000
     fig.layout.margin=dict(l=100, r=100, t=0, b=0)
     graph_container.plotly_chart(fig, use_container_width=True)
+    print(4)
 
 with gcol3:
     table_container = st.container()
@@ -481,6 +450,7 @@ with gcol3:
     table_container.plotly_chart(table_ns, use_container_width=True)
     table_container.markdown("### Threshold Area Percentages")
     table_container.plotly_chart(table_ps, use_container_width=True)
+    print(5)
 
 
 #st.session_state

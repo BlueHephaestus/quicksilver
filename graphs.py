@@ -8,7 +8,7 @@ def get_threshold_graph(session, data_master):
     accessions = data_master[session.accession_col]
     if session.scatter_enable:
         # Scatterplot
-        hovertemplate="<b>%{customdata}</b><br>" + session.x.col + ": %{x}<br>" + session.y.col + ": %{y}<br><extra></extra>"
+        hovertemplate="<b>" + session.accession_col + ": %{customdata}</b><br>" + session.x.col + ": %{x}<br>" + session.y.col + ": %{y}<br><extra></extra>"
         fig = go.Figure(
             data=[
                 go.Scatter(
@@ -47,10 +47,6 @@ def get_threshold_graph(session, data_master):
     fontsize = 30
     fig.update_xaxes(showgrid=False, title=session.x.col, titlefont=dict(size=fontsize), tickfont=dict(size=fontsize))
     fig.update_yaxes(showgrid=False, title=session.y.col, titlefont=dict(size=fontsize), tickfont=dict(size=fontsize))
-
-    #print(session.x.min,session.x.max)
-    #st.session_state["x_thresh"] = x_interval(2)
-    #st.session_state["y_thresh"] = y_interval(2)
 
     # Threshold lines - we use these to draw the main quadrant thresholds
     fig.add_vline(x=session.x.lo, annotation_text=f"{round(session.x.lo,4)}", annotation_font=dict(size=fontsize), annotation_xshift=-shift, annotation_position="left")

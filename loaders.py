@@ -34,7 +34,7 @@ def nan_rows_count(df):
     return len(df[df.isna().all(axis=1)])
 
 
-@st.cache()
+@st.cache(suppress_st_warning=True)
 def load_input_data(input_files):
     """
 
