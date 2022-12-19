@@ -426,6 +426,7 @@ try:
         session.x.hi = st.number_input(
             f'{xname} Higher Threshold',
             session.x.lo, session.x.max, session.x.hi, 0.0001, format="%0.4f")
+        st.markdown("---")
 
         # And via percentiles
         session.x.lo = perc2num(session.x.data, st.number_input(
@@ -434,6 +435,7 @@ try:
         session.x.hi = perc2num(session.x.data, st.number_input(
             f'{xname} Higher Threshold (Percentile)',
             num2perc(session.x.data, session.x.lo), 100., num2perc(session.x.data, session.x.hi), .1, format="%.2f"))
+        st.markdown("---")
 
         # And via stddevs
         session.x.lo = std2num(session.x.std, st.number_input(
@@ -461,10 +463,10 @@ try:
         session.y.lo = st.number_input(
             f'{yname} Lower Threshold',
             session.y.min, session.y.hi, session.y.lo, 0.0001, format="%0.4f")
-
         session.y.hi = st.number_input(
             f'{yname} Higher Threshold',
             session.y.lo, session.y.max, session.y.hi, 0.0001, format="%0.4f")
+        st.markdown("---")
 
         # And via percentiles
         session.y.lo = perc2num(session.y.data, st.number_input(
@@ -473,6 +475,7 @@ try:
         session.y.hi = perc2num(session.y.data, st.number_input(
             f'{yname} Higher Threshold (Percentile)',
             num2perc(session.y.data, session.y.lo), 100., num2perc(session.y.data, session.y.hi), .1, format="%.2f"))
+        st.markdown("---")
 
         # And via stddevs
         session.y.lo = std2num(session.y.std, st.number_input(
