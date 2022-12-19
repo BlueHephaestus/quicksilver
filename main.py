@@ -516,7 +516,7 @@ with acol1:
     st.markdown(f"""
     **Initial Number of Samples**: {len(data_master)}
 
-    **Filtered Number of Samples**: {len(data)}
+    **Filtered Number of Samples**: {len(session.data)}
 
     {f"**Prefix Filters**: {session.row_filter_opts}" if accession_filtering else ""}
 
