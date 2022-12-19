@@ -16,7 +16,6 @@ import streamlit as st
 import numpy as np
 import pandas as pd
 from scipy import stats
-from cross_referencing import *
 from sklearn.preprocessing import power_transform
 from Constants import *
 from sessions import *
@@ -101,6 +100,7 @@ f"#### Current Data: "
 print("Writing current data to container")
 data_container = st.empty()
 data_container.container().write(session.data)
+#data_container.container().write(f"{len(session.data)} samples in dataset.")
 
 ##### DATA PREPARATION AND MODIFICATION TIME #####
 def update_data():
@@ -111,6 +111,7 @@ def update_data():
     :return:
     """
     print("Updating Data...")
+    print(f"{len(data_master)} Samples at Initialization.")
 
     ####### FILTERING #######
     ##### ROW FILTERING #####
@@ -124,10 +125,7 @@ def update_data():
         masks = [data_master[session.accession_col].str.startswith(prefix) for prefix in session.row_filter_opts]
         # Combine all of them with logical OR into one
         if len(masks) != 0:
-            mask = masks[0]
-            if len(masks) > 1:
-                for m in masks[1:]:
-                    mask = mask | m
+            mask = np.logical_or.reduce(masks)
             data = data_master[mask]
         else:
             # Empty dataframe
@@ -135,7 +133,28 @@ def update_data():
             return
     else:
         data = data_master.copy()
+    print(f"{len(data)} Samples remaining after Row Prefix Filtering.")
 
+    ### CATEGORICAL FILTERING ###
+    # If they chose a categorical divisor, and deselected one or more of the categories,
+    # we now filter down the dataset to only be the remaining categories.
+    print(session.categorical_col, session.categorical_divisions, session.categories)
+    if session.categorical_col != "None" and np.sum(session.categorical_divisions) != len(session.categories):
+        # Ensure they didn't deselect everything, if so we ignore (we warned them)
+        if np.sum(session.categorical_divisions) != 0:
+
+            # For all selected categorical divisions, enforce that as a mask for samples.
+            masks = []
+
+            # I could make this a one-line list comprehension but that would be unnecessarily and harder to read.
+            for category, division in zip(session.categories, session.categorical_divisions):
+                if division:
+                    masks.append(data[session.categorical_col] == category)
+            mask = np.logical_or.reduce(masks)
+            # So we don't destroy any prefix filtering that was already done, we use data again.
+            data = data[mask]
+
+    print(f"{len(data)} Samples remaining after Categorical Filtering.")
     ##### COLUMN FILTERING #####
     # Don't remove columns until the very end, so we can still do our row filtering based on column values
     data = data[session.col_filter_opts]
@@ -284,10 +303,30 @@ with col1:
     # Let them choose the types of samples to use, via the prefixes on
     # the accession_col column. F is only one checked by default,
     # however we may also have AAC and S. These are the supported options
-
     if accession_filtering:
         prefixes = ["F", "AAC", "S", "R"]
         session.row_filter_opts = st.multiselect("Choose which Sample Types to use for this Analysis (by prefix):", prefixes, ["F"])
+
+    #### CATEGORICAL HEADER FILTERING ####
+    # Give them the option to choose a column to divide the dataset into.
+    # Unless they pick None, this will result in color coding of samples, and possibly also filtering down the dataset.
+
+    # Get categorical columns, via if they have less than 10 unique values in their set.
+    categorical_columns = ["None"] + [h for h in headers if len(pd.unique(data[h])) < 10]
+    session.categorical_col = st.selectbox("Choose a Categorical Column to label the dataset with:", categorical_columns)
+    if session.categorical_col != "None":
+        #print("CATEGORICAL COL IS NOT NONE", session.categorical_col, type(session.categorical_col))
+        # I can use multiselect for this but I don't like the UI as much as multiple checkboxes.
+        st.write("Choose which categories of samples to include in the dataset (scatterplots will be color-coded)")
+        session.categories = sorted(pd.unique(data[session.categorical_col]))
+        session.categorical_divisions = []
+        for category in session.categories:
+            session.categorical_divisions.append(st.checkbox(str(category), value=True))
+
+        if np.sum(session.categorical_divisions) == 0:
+            st.warning("Removing all categorical divisions will result in an empty dataset and cause errors." + \
+                       "\n\nTo avoid this, the system will now ignore this category.")
+
 
 with col2:
     session.missing_data_opt = st.selectbox(
@@ -324,6 +363,7 @@ with col2:
     # TODO: Add reset button?
     # submitted = st.form_submit_button("UPDATE DATA")
     st.button("UPDATE DATA", on_click=update_data)
+    st.success("Sometimes requires pressing again, e.g. if refreshing the graph.")
 
 "# Data Visualization & Analysis"
 "Using the above dataframe, you can now visualize and analyse the resulting data however you like."
@@ -333,12 +373,13 @@ gfcol1, gfcol2 = st.columns(2)
 gcol1x, gcol1y, gcol2, gcol3 = st.columns((1,1,4,2), gap="small")
 
 #print([data[col].dtype for col in data.columns])
-numeric_cols = [col for col in session.data.columns if np.issubdtype(session.data[col].dtype, np.number)]
+numeric_cols = [col for col in session.data.columns if np.issubdtype(session.data[col].dtype, np.number) and col != session.categorical_col]
 print("COLUMNS", session.data.columns)
+#print("CATEGORICAL COL", session.categorical_col, type(session.categorical_col))
 with gfcol1:
     # Only allow choice of numeric columns, for now.
-    session.x.col = st.selectbox("Input / Independent Variables: ", numeric_cols, index=0)
-    session.y.col = st.selectbox("Output / Dependent Variables: ", numeric_cols, index=1)
+    session.x.col = st.selectbox("Input / Independent Variables: ", numeric_cols, index=len(numeric_cols)//2)
+    session.y.col = st.selectbox("Output / Dependent Variables: ", numeric_cols, index=len(numeric_cols)//2+1)
     session.scatter_enable = st.checkbox("Render graph as scatterplot instead of histogram (this will lower performance)")
 with gfcol2:
     st.markdown("#")
@@ -353,9 +394,15 @@ session.x.update(session.data)
 session.y.update(session.data)
 xname = session.x.col
 yname = session.y.col
+
 mask_n = lambda m: np.sum(m)/len(m)*100  # compute % in masked area
+
 perc2num = lambda data, p: np.percentile(data, p)
 num2perc = lambda data, n: np.sum(data < n)/len(data)*100
+
+#std2num = lambda data, s:
+num2std = lambda std, n: n/std
+std2num = lambda std, n: n*std
 
 error_msg_template = """
 Tried to render graph of column {}, but encountered the following error.
@@ -368,7 +415,7 @@ try:
     with gcol1x:
         # Settings for x threshold
         session.x.lo, session.x.hi = st.slider(
-            f'{xname} threshold',
+            f'{xname} Threshold',
             session.x.min, session.x.max, session.x.interval(2), 0.01, format="%0.2f")
 
         # Can also be controlled with more granularity
@@ -386,25 +433,28 @@ try:
         session.x.hi = perc2num(session.x.data, st.number_input(
             f'{xname} Higher Threshold (Percentile)',
             num2perc(session.x.data, session.x.lo), 100., num2perc(session.x.data, session.x.hi), .1, format="%.2f"))
+
+        # And via stddevs
+        session.x.lo = std2num(session.x.std, st.number_input(
+            f'{xname} Lower Threshold (Mult. of STD)',
+            0., num2std(session.x.std, session.x.hi), num2std(session.x.std, session.x.lo), .1, format="%.2f"))
+        session.x.hi = std2num(session.x.std, st.number_input(
+            f'{xname} Higher Threshold (Mult. of STD)',
+            num2std(session.x.std, session.x.lo), 100., num2std(session.x.std, session.x.hi), .1, format="%.2f"))
+
 except st.errors.StreamlitAPIException:
-    if "x_lo" not in st.session_state:
-        # First time running this, update the data so we get something started.
-        update_data()
     st.write(error_msg_template.format(yname))
     print(traceback.format_exc())
+    st.write(traceback.format_exc())
     st.write(error_msg_template.format(xname))
+    print(traceback.format_exc())
+    st.write(traceback.format_exc())
 
 try:
     with gcol1y:
-        # Spacer
-        # st.markdown("#")
-        # st.markdown("#")
-        # st.markdown("#")
-        # st.markdown("#")
-
         # Settings for y threshold
         session.y.lo, session.y.hi = st.slider(
-            f'{yname} threshold',
+            f'{yname} Threshold',
             session.y.min, session.y.max, session.y.interval(2), 0.01, format="%0.2f")
 
         session.y.lo = st.number_input(
@@ -422,6 +472,14 @@ try:
         session.y.hi = perc2num(session.y.data, st.number_input(
             f'{yname} Higher Threshold (Percentile)',
             num2perc(session.y.data, session.y.lo), 100., num2perc(session.y.data, session.y.hi), .1, format="%.2f"))
+
+        # And via stddevs
+        session.y.lo = std2num(session.y.std, st.number_input(
+            f'{yname} Lower Threshold (Mult. of STD)',
+            0., num2std(session.y.std, session.y.hi), num2std(session.y.std, session.y.lo), .1, format="%.2f"))
+        session.y.hi = std2num(session.y.std, st.number_input(
+            f'{yname} Higher Threshold (Mult. of STD)',
+            num2std(session.y.std, session.y.lo), 100., num2std(session.y.std, session.y.hi), .1, format="%.2f"))
 
         # on change, change the lines.
         #st.write('Values:', values) # and then we can add on the % etc.
@@ -448,6 +506,9 @@ with gcol3:
     table_container.markdown("### Threshold Area Percentages")
     table_container.plotly_chart(table_ps, use_container_width=True)
 
+
+# Final container! Update with the values for our two columns in question,
+# Displaying all the data in a table data dump (or in a copy-paste format as well.)
 
 #st.session_state
 

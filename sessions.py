@@ -59,6 +59,9 @@ class Session:
         self.data_master = data_master
         self.data = data_master.copy()
         self.accession_col = accession_col
+        self.categorical_col = "None"
+        self.categories = []
+        self.categorical_divisions = []
 
         self.row_filter_opts = []
         self.col_filter_opts = []

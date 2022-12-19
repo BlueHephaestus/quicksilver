@@ -88,7 +88,7 @@ def get_threshold_tables(session):
     )])
     fig_ps = go.Figure(data=[go.Table(
         header=None,
-        cells=dict(values=grid_ps, height=80, align="center", suffix="%"),
+        cells=dict(values=grid_ps, height=80, suffix="%"),
     )])
     # Remove headers via making invisible
     fig_ns.for_each_trace(lambda t: t.update(header_fill_color='rgba(0,0,0,0)'))

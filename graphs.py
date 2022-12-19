@@ -1,5 +1,6 @@
 import plotly.graph_objects as go
 from Constants import *
+import numpy as np
 #@st.cache(allow_output_mutation=True)
 def get_threshold_graph(session, data_master):
     #x = get_x()
@@ -9,18 +10,58 @@ def get_threshold_graph(session, data_master):
     if session.scatter_enable:
         # Scatterplot
         hovertemplate="<b>" + session.accession_col + ": %{customdata}</b><br>" + session.x.col + ": %{x}<br>" + session.y.col + ": %{y}<br><extra></extra>"
-        fig = go.Figure(
-            data=[
-                go.Scatter(
-                    x=session.x.data,
-                    y=session.y.data,
-                    mode="markers",
-                    customdata=accessions,
-                    hovertemplate=hovertemplate
-                )
-            ],
-            layout_height=800,
-        )
+
+        # Get color codes for each point based on categorical column.
+        color_coding = False
+        if session.categorical_col != "None":
+            #divisions only, remember.
+            # color = index of the value in the categories array ( we already know it's in there, and will have value.)
+            # f, m, u -> [colormap[0], colormap[1], colormap[2]]
+
+            # we already know it's filtered
+            # we also know we won't be graphing any of the categorical col
+            # for category in session.data[session.categorical_col]:
+            #     COLORMAP[categories.index cat])
+
+            # Create zeroed colors array, then update the ones that match each category to their respective color.
+            color_coding = True
+            colors = np.zeros((len(session.x.data)), dtype=np.object)
+            for i, category in enumerate(session.categories):
+                #if session.categorical_divisions[i]:
+                colors[session.data[session.categorical_col] == category] = COLORMAP[i]
+
+        print(session.categorical_divisions)
+        print(len(session.data))
+
+        if color_coding:
+            fig = go.Figure(
+                data=[
+                    go.Scatter(
+                        x=session.x.data[session.data[session.categorical_col] == category],
+                        y=session.y.data[session.data[session.categorical_col] == category],
+                        mode="markers",
+                        marker=dict(color=COLORMAP[i]),
+                        name=f"{session.categorical_col} = {category}",
+                        customdata=accessions,
+                        hovertemplate=hovertemplate
+                    ) for i, category in enumerate(session.categories)
+                ],
+                layout_height=800,
+            )
+            fig.update_layout(font=dict(size=20))
+        else:
+            fig = go.Figure(
+                data=[
+                    go.Scatter(
+                        x=session.x.data,
+                        y=session.y.data,
+                        mode="markers",
+                        customdata=accessions,
+                        hovertemplate=hovertemplate
+                    )
+                ],
+                layout_height=800,
+            )
     else:
         # Histogram
         # oi future self not sure how or if we can have accessions on the histogram2d points
@@ -56,9 +97,9 @@ def get_threshold_graph(session, data_master):
     # Threshold areas (rectangles)
     # for some reason need an extra buffer for the minimum x one.
     fig.add_vrect(x0=session.x.min-session.x.std, x1=session.x.lo, fillcolor="blue", opacity=.2)
-    fig.add_vrect(x0=session.x.hi, x1=session.x.max, fillcolor="blue", opacity=.2)
+    fig.add_vrect(x0=session.x.hi, x1=session.x.max+session.x.std, fillcolor="blue", opacity=.2)
     fig.add_hrect(y0=session.y.min-session.y.std, y1=session.y.lo, fillcolor="red", opacity=.2)
-    fig.add_hrect(y0=session.y.hi, y1=session.y.max, fillcolor="red", opacity=.2)
+    fig.add_hrect(y0=session.y.hi, y1=session.y.max+session.y.std, fillcolor="red", opacity=.2)
 
 
     return fig
