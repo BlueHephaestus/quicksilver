@@ -71,6 +71,7 @@ st.markdown("""<style>div.stButton > button:first-child {
             """, unsafe_allow_html=True)
 
 
+
 "# Data Preparation"
 
 input_file = st.file_uploader("Choose file(s) for Population Analysis. If no file(s) is chosen, the default will be used.", accept_multiple_files=True, type=["txt","csv","xls","xlsx"])
@@ -378,8 +379,8 @@ print("COLUMNS", session.data.columns)
 #print("CATEGORICAL COL", session.categorical_col, type(session.categorical_col))
 with gfcol1:
     # Only allow choice of numeric columns, for now.
-    session.x.col = st.selectbox("Input / Independent Variables: ", numeric_cols, index=len(numeric_cols)//2)
-    session.y.col = st.selectbox("Output / Dependent Variables: ", numeric_cols, index=len(numeric_cols)//2+1)
+    session.x.col = st.selectbox("X-Axis Variable: ", numeric_cols, index=len(numeric_cols)//2)
+    session.y.col = st.selectbox("Y-Axis Variable: ", numeric_cols, index=len(numeric_cols)//2+1)
     session.scatter_enable = st.checkbox("Render graph as scatterplot instead of histogram (this will lower performance)")
 with gfcol2:
     st.markdown("#")
@@ -500,7 +501,7 @@ with gcol2:
 
 with gcol3:
     table_container = st.container()
-    table_ns, table_ps = get_threshold_tables(session)
+    table_ns, table_ps, grid_ns, grid_ps = get_threshold_tables(session)
     table_container.markdown("### Threshold Areas")
     table_container.plotly_chart(table_ns, use_container_width=True)
     table_container.markdown("### Threshold Area Percentages")
@@ -509,6 +510,103 @@ with gcol3:
 
 # Final container! Update with the values for our two columns in question,
 # Displaying all the data in a table data dump (or in a copy-paste format as well.)
+st.markdown("# Analysis Values:")
+acol1, acol2, acol3, acol4 = st.columns(4)
+with acol1:
+    st.markdown(f"""
+    **Initial Number of Samples**: {len(data_master)}
+
+    **Filtered Number of Samples**: {len(data)}
+
+    {f"**Prefix Filters**: {session.row_filter_opts}" if accession_filtering else ""}
+
+    **Categorical Column**: {session.categorical_col}
+    
+    **Categories Used**: {[category for i,category in enumerate(session.categories) if session.categorical_divisions[i]] if session.categorical_col != "None" else "None"}
+    
+    ### Transformations Used:
+    
+    **Missing Data Handling**: {session.missing_data_opt}
+    
+    **Logarithmic Scaling Method**: {session.log_opt}
+    
+    **Scaling / Normalization Method**: {session.scaling_opt}
+    
+    **Data Transformations**: {session.transformation_opt}
+    """)
+
+def generate_variable_markdown(var):
+    return f"""
+
+    ### {var.col}
+
+    **Mean**: {var.mean:.4f}
+
+    **STD**: {var.std:.4f}
+
+    **Minimum**: {var.min:.4f}
+
+    **Maximum**: {var.max:.4f}
+
+    **Low Threshold Value**: {var.lo:.4f}
+
+    **High Threshold Value**: {var.hi:.4f}
+    
+    **Low Threshold Percentile**: {num2perc(var.data, var.lo):.4f}
+    
+    **High Threshold Percentile**: {num2perc(var.data, var.hi):.4f}
+    
+    **Low Threshold Multiple of STD**: {num2std(var.std, var.lo):.4f}
+    
+    **High Threshold Multiple of STD**: {num2std(var.std, var.hi):.4f}
+    """
+
+
+with acol2:
+    st.markdown(generate_variable_markdown(session.x))
+
+with acol3:
+    st.markdown(generate_variable_markdown(session.y))
+
+def generate_markdown_table(grid, col_lambda=lambda n: n):
+    gs = ""
+    n = len(grid)
+    for i,row in enumerate(grid):
+        s = "|"
+        for j,col in enumerate(row):
+            if i == n-1 or j == n-1:
+                s += f" **{col_lambda(col)}** |"
+            else:
+                s += f" {col_lambda(col)} |"
+        gs += s + "\n"
+    return gs
+
+with acol4:
+
+    st.markdown(f"""
+### Threshold Areas:
+
+| | | | |
+| --- | --- | --- | --- |
+{generate_markdown_table(grid_ns)}
+
+# 
+
+### Threshold Area Percentages:
+
+| | | | |
+| --- | --- | --- | --- |
+{generate_markdown_table(grid_ps, lambda col: f"{col:.2f}%")}
+    """)
+st.warning("There is a known issue where the number input fields in the visualization section will not always sync with each other. "
+           "Unfortunately this is a bug in the library being used here, so it is currently not avoidable. "
+           "Fortunately, the absolute values that are rendered in the visualization section can be verified here, where they are correctly synced. ")
+
+#st.success("Made by Blue Hephaestus")
+st.markdown("<div style='text-align: right'> Quicksilver, 2022 <br> Made by Blue Hephaestus for UPHL </div>", unsafe_allow_html=True)
+
+#st.write(f"")
+#st.write(f"Filtered Number of Samples: {len(data)}")
 
 #st.session_state
 
