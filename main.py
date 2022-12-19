@@ -27,26 +27,26 @@ import sys, traceback
 st.set_page_config(page_title="Quicksilver", layout="wide")
 
 # Update styling for multiselect so it's not tiny
-st.markdown("""<style>.stMultiSelect > label {
-            font-size:105%; font-weight:bold
-            } </style>""",unsafe_allow_html=True)
+# st.markdown("""<style>.stMultiSelect > label {
+#             font-size:105%; font-weight:bold
+#             } </style>""",unsafe_allow_html=True)
 # Make sure large multiselects go to scroll rather than filling the page
 st.markdown("""<style>.stMultiSelect > div {
             max-height:300px;
             overflow-y:scroll;
             } </style>""",unsafe_allow_html=True)
 # Make labels for selectbox not tiny either
-st.markdown("""<style>.stSelectbox > label {
-            font-size:105%; font-weight:bold
-            } </style>""",unsafe_allow_html=True)
+# st.markdown("""<style>.stSelectbox > label {
+#             font-size:105%; font-weight:bold
+#             } </style>""",unsafe_allow_html=True)
 
 # Update fonts for other elements
-st.markdown("""<style>.stSlider > label {
-            font-size:105%; font-weight:bold
-            } </style>""",unsafe_allow_html=True)
-st.markdown("""<style>.stNumberInput > label {
-            font-size:105%; font-weight:normal
-            } </style>""",unsafe_allow_html=True)
+# st.markdown("""<style>.stSlider > label {
+#             font-size:105%; font-weight:bold
+#             } </style>""",unsafe_allow_html=True)
+# st.markdown("""<style>.stNumberInput > label {
+#             font-size:105%; font-weight:normal
+#             } </style>""",unsafe_allow_html=True)
 
 # Replicate the actual form template without it's restrictions
 st.markdown("""<style>div[data-testid="stHorizontalBlock"] {
@@ -70,6 +70,7 @@ st.markdown("""<style>div.stButton > button:first-child {
             #width:10em;
             }
             """, unsafe_allow_html=True)
+
 
 "# Data Preparation"
 
@@ -329,7 +330,7 @@ with col2:
 
 gfcol1, gfcol2 = st.columns(2)
 
-gcol1x, gcol1y, gcol2, gcol3 = st.columns((1,1,4,2), gap="large")
+gcol1x, gcol1y, gcol2, gcol3 = st.columns((1,1,4,2), gap="small")
 
 #print([data[col].dtype for col in data.columns])
 numeric_cols = [col for col in session.data.columns if np.issubdtype(session.data[col].dtype, np.number)]
@@ -350,7 +351,6 @@ with gfcol2:
 # Update these attributes when we have columns for them
 session.x.update(session.data)
 session.y.update(session.data)
-print(1)
 xname = session.x.col
 yname = session.y.col
 mask_n = lambda m: np.sum(m)/len(m)*100  # compute % in masked area
@@ -369,7 +369,7 @@ try:
         # Settings for x threshold
         session.x.lo, session.x.hi = st.slider(
             f'{xname} threshold',
-            session.x.min, session.x.max, session.x.interval(2), 0.01, format="%0.4f")
+            session.x.min, session.x.max, session.x.interval(2), 0.01, format="%0.2f")
 
         # Can also be controlled with more granularity
         session.x.lo = st.number_input(
@@ -394,7 +394,6 @@ except st.errors.StreamlitAPIException:
     print(traceback.format_exc())
     st.write(error_msg_template.format(xname))
 
-print(2)
 try:
     with gcol1y:
         # Spacer
@@ -406,7 +405,7 @@ try:
         # Settings for y threshold
         session.y.lo, session.y.hi = st.slider(
             f'{yname} threshold',
-            session.y.min, session.y.max, session.y.interval(2), 0.01, format="%0.4f")
+            session.y.min, session.y.max, session.y.interval(2), 0.01, format="%0.2f")
 
         session.y.lo = st.number_input(
             f'{yname} Lower Threshold',
@@ -431,17 +430,15 @@ except st.errors.StreamlitAPIException:
     print(traceback.format_exc())
     st.write(traceback.format_exc())
 
-print(3)
 with gcol2:
     # TODO remove width stuff?
     graph_container = st.container()
     fig = get_threshold_graph(session, data_master)
     # Set up some reasonable margins and heights so we actually get a more square-like graph
     # rather than the wide boi streamlit wants it to be
-    fig.layout.height=1000
-    fig.layout.margin=dict(l=100, r=100, t=0, b=0)
+    #fig.layout.height=1000
+    #fig.layout.margin=dict(l=100, r=100, t=0, b=0)
     graph_container.plotly_chart(fig, use_container_width=True)
-    print(4)
 
 with gcol3:
     table_container = st.container()
@@ -450,7 +447,6 @@ with gcol3:
     table_container.plotly_chart(table_ns, use_container_width=True)
     table_container.markdown("### Threshold Area Percentages")
     table_container.plotly_chart(table_ps, use_container_width=True)
-    print(5)
 
 
 #st.session_state

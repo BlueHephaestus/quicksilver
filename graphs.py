@@ -1,5 +1,5 @@
 import plotly.graph_objects as go
-
+from Constants import *
 #@st.cache(allow_output_mutation=True)
 def get_threshold_graph(session, data_master):
     #x = get_x()
@@ -44,15 +44,14 @@ def get_threshold_graph(session, data_master):
     # Set these up to be changing relative to the session state values, which change as the slider changes.
     # TODO: can make shift into x and y and make it relative to the size of the vrect and hrect if we want
     shift = 0
-    fontsize = 30
-    fig.update_xaxes(showgrid=False, title=session.x.col, titlefont=dict(size=fontsize), tickfont=dict(size=fontsize))
-    fig.update_yaxes(showgrid=False, title=session.y.col, titlefont=dict(size=fontsize), tickfont=dict(size=fontsize))
+    fig.update_xaxes(showgrid=False, title=session.x.col, titlefont=dict(size=FONTSIZE), tickfont=dict(size=FONTSIZE))
+    fig.update_yaxes(showgrid=False, title=session.y.col, titlefont=dict(size=FONTSIZE), tickfont=dict(size=FONTSIZE))
 
     # Threshold lines - we use these to draw the main quadrant thresholds
-    fig.add_vline(x=session.x.lo, annotation_text=f"{round(session.x.lo,4)}", annotation_font=dict(size=fontsize), annotation_xshift=-shift, annotation_position="left")
-    fig.add_vline(x=session.x.hi, annotation_text=f"{round(session.x.hi,4)}", annotation_font=dict(size=fontsize), annotation_xshift=shift, annotation_position="right")
-    fig.add_hline(y=session.y.lo, annotation_text=f"{round(session.y.lo,4)}", annotation_font=dict(size=fontsize), annotation_yshift=-shift, annotation_position="bottom")
-    fig.add_hline(y=session.y.hi, annotation_text=f"{round(session.y.hi,4)}", annotation_font=dict(size=fontsize), annotation_yshift=shift, annotation_position="top")
+    fig.add_vline(x=session.x.lo, annotation_text=f"{round(session.x.lo,2)}", annotation_font=dict(size=FONTSIZE), annotation_xshift=-shift, annotation_position="left")
+    fig.add_vline(x=session.x.hi, annotation_text=f"{round(session.x.hi,2)}", annotation_font=dict(size=FONTSIZE), annotation_xshift=shift, annotation_position="right")
+    fig.add_hline(y=session.y.lo, annotation_text=f"{round(session.y.lo,2)}", annotation_font=dict(size=FONTSIZE), annotation_yshift=-shift, annotation_position="bottom")
+    fig.add_hline(y=session.y.hi, annotation_text=f"{round(session.y.hi,2)}", annotation_font=dict(size=FONTSIZE), annotation_yshift=shift, annotation_position="top")
 
     # Threshold areas (rectangles)
     # for some reason need an extra buffer for the minimum x one.
