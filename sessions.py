@@ -1,4 +1,5 @@
 import numpy as np
+from Constants import *
 
 class Variable:
     def __init__(self):
@@ -73,6 +74,9 @@ class Session:
 
         self.x = Variable()
         self.y = Variable()
+        self.graph_type = GRAPH_TYPES[0]
+        self.single_var = False # SINGLE VARIABLE ANALYSIS
+        self.thresholding = True
         self.scatter_enable = False
 
 

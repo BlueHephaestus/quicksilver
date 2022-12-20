@@ -1,6 +1,8 @@
 import plotly.graph_objects as go
+import streamlit as st
 from Constants import *
 import numpy as np
+import pandas as pd
 #@st.cache(allow_output_mutation=True)
 def get_threshold_graph(session, data_master):
     #x = get_x()
@@ -102,4 +104,25 @@ def get_threshold_graph(session, data_master):
     fig.add_hrect(y0=session.y.hi, y1=session.y.max+session.y.std, fillcolor="red", opacity=.2)
 
 
+    return fig
+
+def get_singlevar_histogram(session):
+
+    default_bins = int(np.ceil(np.sqrt(len(session.x.data))))
+    fig = go.Figure(
+        data=[
+            go.Histogram(
+                x=session.x.data,
+                nbinsx=st.slider("Number of Bins", 1, 4*default_bins, default_bins),
+            )
+        ],
+        layout_height=800,
+    )
+    #print(fig.data[0].nbinsx)
+    fig.update_layout(
+        title_text = f"<b>'{session.x.col}'</b> Analysis on {len(session.data)} Samples",
+        title_font=dict(size=FONTSIZE),
+    )
+    fig.update_xaxes(showgrid=False, title=session.x.col, titlefont=dict(size=FONTSIZE), tickfont=dict(size=FONTSIZE))
+    fig.update_yaxes(showgrid=False, title="Population", titlefont=dict(size=FONTSIZE), tickfont=dict(size=FONTSIZE))
     return fig

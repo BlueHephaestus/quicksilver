@@ -21,6 +21,7 @@ from Constants import *
 from sessions import *
 from graphs import *
 from tables import *
+from sections import *
 from loaders import *
 import sys, traceback
 st.set_page_config(page_title="Quicksilver", layout="wide")
@@ -369,9 +370,9 @@ with col2:
 "# Data Visualization & Analysis"
 "Using the above dataframe, you can now visualize and analyse the resulting data however you like."
 
+
 gfcol1, gfcol2 = st.columns(2)
 
-gcol1x, gcol1y, gcol2, gcol3 = st.columns((1,1,4,2), gap="small")
 
 #print([data[col].dtype for col in data.columns])
 numeric_cols = [col for col in session.data.columns if np.issubdtype(session.data[col].dtype, np.number) and col != session.categorical_col]
@@ -379,137 +380,24 @@ print("COLUMNS", session.data.columns)
 #print("CATEGORICAL COL", session.categorical_col, type(session.categorical_col))
 with gfcol1:
     # Only allow choice of numeric columns, for now.
+    session.graph_type = st.selectbox("Choose the type of graph generated: ", GRAPH_TYPES)
     session.x.col = st.selectbox("X-Axis Variable: ", numeric_cols, index=len(numeric_cols)//2)
-    session.y.col = st.selectbox("Y-Axis Variable: ", numeric_cols, index=len(numeric_cols)//2+1)
-    session.scatter_enable = st.checkbox("Render graph as scatterplot instead of histogram (this will lower performance)")
+
+    # Remove second variable if single variable analysis chosen
+    session.single_var = session.graph_type == GRAPH_TYPES[1]
+    session.thresholding = session.graph_type == GRAPH_TYPES[0]
+    if not session.single_var:
+        session.y.col = st.selectbox("Y-Axis Variable: ", numeric_cols, index=len(numeric_cols)//2+1)
+        session.scatter_enable = st.checkbox("Render graph as scatterplot instead of histogram (this will lower performance)")
+
 with gfcol2:
     st.markdown("#")
     #st.button("GENERATE GRAPH", on_click=lambda x:x, args=(input, output))
 
-
-# TODO set this up so that they have to press update to update the graph?
-# If the user hasn't specified values for this, then don't show anything yet.
-
-# Update these attributes when we have columns for them
-session.x.update(session.data)
-session.y.update(session.data)
-xname = session.x.col
-yname = session.y.col
-
-mask_n = lambda m: np.sum(m)/len(m)*100  # compute % in masked area
-
-perc2num = lambda data, p: np.percentile(data, p)
-num2perc = lambda data, n: np.sum(data < n)/len(data)*100
-
-#std2num = lambda data, s:
-num2std = lambda std, n: n/std
-std2num = lambda std, n: n*std
-
-error_msg_template = """
-Tried to render graph of column {}, but encountered the following error.
-Remember that changes made to the dataset don't propagate until the Update Data button is clicked,
-and make sure you haven't applied transformations on columns that result in undefined data! (e.g. logarithm of negative numbers).
-"""
-# PROBLEM: TODO: Updates to values in later widgets don't update earlier ones. if i change the number it doesn't move slider.
-# Unfortunately this is a limitation of streamlit, and can't be fixed yet. Fortuantely, it still changes the graph.
-try:
-    with gcol1x:
-        # Settings for x threshold
-        session.x.lo, session.x.hi = st.slider(
-            f'{xname} Threshold',
-            session.x.min, session.x.max, session.x.interval(2), 0.01, format="%0.2f")
-
-        # Can also be controlled with more granularity
-        session.x.lo = st.number_input(
-            f'{xname} Lower Threshold',
-            session.x.min, session.x.hi, session.x.lo, 0.0001, format="%0.4f")
-        session.x.hi = st.number_input(
-            f'{xname} Higher Threshold',
-            session.x.lo, session.x.max, session.x.hi, 0.0001, format="%0.4f")
-        st.markdown("---")
-
-        # And via percentiles
-        session.x.lo = perc2num(session.x.data, st.number_input(
-            f'{xname} Lower Threshold (Percentile)',
-            0., num2perc(session.x.data, session.x.hi), num2perc(session.x.data, session.x.lo), .1, format="%.2f"))#Streamlit does not allow % symbol here
-        session.x.hi = perc2num(session.x.data, st.number_input(
-            f'{xname} Higher Threshold (Percentile)',
-            num2perc(session.x.data, session.x.lo), 100., num2perc(session.x.data, session.x.hi), .1, format="%.2f"))
-        st.markdown("---")
-
-        # And via stddevs
-        session.x.lo = std2num(session.x.std, st.number_input(
-            f'{xname} Lower Threshold (Mult. of STD)',
-            0., num2std(session.x.std, session.x.hi), num2std(session.x.std, session.x.lo), .1, format="%.2f"))
-        session.x.hi = std2num(session.x.std, st.number_input(
-            f'{xname} Higher Threshold (Mult. of STD)',
-            num2std(session.x.std, session.x.lo), 100., num2std(session.x.std, session.x.hi), .1, format="%.2f"))
-
-except st.errors.StreamlitAPIException:
-    st.write(error_msg_template.format(yname))
-    print(traceback.format_exc())
-    st.write(traceback.format_exc())
-    st.write(error_msg_template.format(xname))
-    print(traceback.format_exc())
-    st.write(traceback.format_exc())
-
-try:
-    with gcol1y:
-        # Settings for y threshold
-        session.y.lo, session.y.hi = st.slider(
-            f'{yname} Threshold',
-            session.y.min, session.y.max, session.y.interval(2), 0.01, format="%0.2f")
-
-        session.y.lo = st.number_input(
-            f'{yname} Lower Threshold',
-            session.y.min, session.y.hi, session.y.lo, 0.0001, format="%0.4f")
-        session.y.hi = st.number_input(
-            f'{yname} Higher Threshold',
-            session.y.lo, session.y.max, session.y.hi, 0.0001, format="%0.4f")
-        st.markdown("---")
-
-        # And via percentiles
-        session.y.lo = perc2num(session.y.data, st.number_input(
-            f'{yname} Lower Threshold (Percentile)',
-            0., num2perc(session.y.data, session.y.hi), num2perc(session.y.data, session.y.lo), .1, format="%.2f"))#Streamlit does not allow % symbol here
-        session.y.hi = perc2num(session.y.data, st.number_input(
-            f'{yname} Higher Threshold (Percentile)',
-            num2perc(session.y.data, session.y.lo), 100., num2perc(session.y.data, session.y.hi), .1, format="%.2f"))
-        st.markdown("---")
-
-        # And via stddevs
-        session.y.lo = std2num(session.y.std, st.number_input(
-            f'{yname} Lower Threshold (Mult. of STD)',
-            0., num2std(session.y.std, session.y.hi), num2std(session.y.std, session.y.lo), .1, format="%.2f"))
-        session.y.hi = std2num(session.y.std, st.number_input(
-            f'{yname} Higher Threshold (Mult. of STD)',
-            num2std(session.y.std, session.y.lo), 100., num2std(session.y.std, session.y.hi), .1, format="%.2f"))
-
-        # on change, change the lines.
-        #st.write('Values:', values) # and then we can add on the % etc.
-except st.errors.StreamlitAPIException:
-    st.write(error_msg_template.format(yname))
-    print(traceback.format_exc())
-    st.write(traceback.format_exc())
-
-with gcol2:
-    # TODO remove width stuff?
-    graph_container = st.container()
-    fig = get_threshold_graph(session, data_master)
-    # Set up some reasonable margins and heights so we actually get a more square-like graph
-    # rather than the wide boi streamlit wants it to be
-    #fig.layout.height=1000
-    #fig.layout.margin=dict(l=100, r=100, t=0, b=0)
-    graph_container.plotly_chart(fig, use_container_width=True)
-
-with gcol3:
-    table_container = st.container()
-    table_ns, table_ps, grid_ns, grid_ps = get_threshold_tables(session)
-    table_container.markdown("### Threshold Areas")
-    table_container.plotly_chart(table_ns, use_container_width=True)
-    table_container.markdown("### Threshold Area Percentages")
-    table_container.plotly_chart(table_ps, use_container_width=True)
-
+if session.thresholding:
+    session, grid_ns, grid_ps = generate_threshold_section(session)
+elif session.single_var:
+    session = generate_singlevar_section(session)
 
 # Final container! Update with the values for our two columns in question,
 # Displaying all the data in a table data dump (or in a copy-paste format as well.)
@@ -536,10 +424,12 @@ with acol1:
     **Scaling / Normalization Method**: {session.scaling_opt}
     
     **Data Transformations**: {session.transformation_opt}
+    
+    **Graph / Analysis Type**: {session.graph_type}
     """)
 
 def generate_variable_markdown(var):
-    return f"""
+    md = f"""
 
     ### {var.col}
 
@@ -550,7 +440,9 @@ def generate_variable_markdown(var):
     **Minimum**: {var.min:.4f}
 
     **Maximum**: {var.max:.4f}
-
+    """
+    if session.thresholding:
+        md += f"""
     **Low Threshold Value**: {var.lo:.4f}
 
     **High Threshold Value**: {var.hi:.4f}
@@ -563,30 +455,34 @@ def generate_variable_markdown(var):
     
     **High Threshold Multiple of STD**: {num2std(var.std, var.hi):.4f}
     """
+    return md
 
 
 with acol2:
     st.markdown(generate_variable_markdown(session.x))
 
-with acol3:
-    st.markdown(generate_variable_markdown(session.y))
+if not session.single_var:
+    with acol3:
+        st.markdown(generate_variable_markdown(session.y))
 
-def generate_markdown_table(grid, col_lambda=lambda n: n):
-    gs = ""
-    n = len(grid)
-    for i,row in enumerate(grid):
-        s = "|"
-        for j,col in enumerate(row):
-            if i == n-1 or j == n-1:
-                s += f" **{col_lambda(col)}** |"
-            else:
-                s += f" {col_lambda(col)} |"
-        gs += s + "\n"
-    return gs
+if session.graph_type == "Threshold Testing":
+    def generate_markdown_table(grid, col_lambda=lambda n: n):
+        gs = ""
+        n = len(grid)
+        for i,row in enumerate(grid):
+            s = "|"
+            for j,col in enumerate(row):
+                if i == n-1 or j == n-1:
+                    s += f" **{col_lambda(col)}** |"
+                else:
+                    s += f" {col_lambda(col)} |"
+            gs += s + "\n"
+        return gs
 
-with acol4:
+    with acol4:
 
-    st.markdown(f"""
+        # markdown doesn't like tabs
+        st.markdown(f"""
 ### Threshold Areas:
 
 | | | | |
@@ -601,9 +497,10 @@ with acol4:
 | --- | --- | --- | --- |
 {generate_markdown_table(grid_ps, lambda col: f"{col:.2f}%")}
     """)
-st.warning("There is a known issue where the number input fields in the visualization section will not always sync with each other. "
-           "Unfortunately this is a bug in the library being used here, so it is currently not avoidable. "
-           "Fortunately, the absolute values that are rendered in the visualization section can be verified here, where they are correctly synced. ")
+
+    st.warning("There is a known issue where the number input fields in the visualization section will not always sync with each other. "
+               "Unfortunately this is a bug in the library being used here, so it is currently not avoidable. "
+               "Fortunately, the absolute values that are rendered in the visualization section can be verified here, where they are correctly synced. ")
 
 #st.success("Made by Blue Hephaestus")
 st.markdown("<div style='text-align: right'> Quicksilver, 2022 <br> Made by Blue Hephaestus for UPHL </div>", unsafe_allow_html=True)
